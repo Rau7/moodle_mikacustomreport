@@ -128,7 +128,36 @@ $records = $DB->get_records_sql($sql, $params, $start, $length);
 
 $output = [];
 foreach ($records as $row) {
-    $output[] = (array)$row;
+    $rowArray = (array)$row;
+    $formattedRow = [];
+    
+    // Map the database field names to the expected field names in the DataTable
+    foreach ($rowArray as $key => $value) {
+        // For user fields
+        if (isset($data['user'])) {
+            foreach ($data['user'] as $field) {
+                if (strpos($key, $field) !== false || $key === $field) {
+                    $formattedRow[$field] = $value;
+                }
+            }
+        }
+        
+        // For activity fields
+        if (isset($data['activity'])) {
+            foreach ($data['activity'] as $field) {
+                if (strpos($key, $field) !== false || $key === $field) {
+                    $formattedRow[$field] = $value;
+                }
+            }
+        }
+        
+        // For fields that don't match the pattern above
+        if (!array_key_exists($key, $formattedRow)) {
+            $formattedRow[$key] = $value;
+        }
+    }
+    
+    $output[] = $formattedRow;
 }
 
 echo json_encode([

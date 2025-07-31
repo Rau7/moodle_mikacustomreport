@@ -1,4 +1,4 @@
-let datatable;
+let datatable = null;
 
 document.addEventListener("DOMContentLoaded", function () {
   const checkboxes = document.querySelectorAll(".field-checkbox");
@@ -21,64 +21,84 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function renderTableHeader(columns) {
-    thead.innerHTML = ""; // Tüm başlıkları sil
+    thead.innerHTML = "";
     const tr = document.createElement("tr");
     columns.forEach((col) => {
       const th = document.createElement("th");
-      th.textContent = col.title || col.data;
+      th.textContent = col;
       tr.appendChild(th);
     });
     thead.appendChild(tr);
+  }
+
+  function renderTableData(data) {
+    tbody.innerHTML = "";
+
+    if (data.length === 0) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.textContent = "Veri bulunamadı";
+      td.colSpan = thead.querySelectorAll("th").length || 1;
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
+
+    data.forEach((row) => {
+      const tr = document.createElement("tr");
+      Object.values(row).forEach((value) => {
+        const td = document.createElement("td");
+        td.textContent = value !== null ? value : "N/A";
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
   }
 
   function rebuildDataTable() {
     const selected = getSelectedFields();
     const allFields = [...selected.user, ...selected.activity];
 
-    if (datatable) {
-      datatable.destroy();
-      tbody.innerHTML = "";
-    }
-
     if (allFields.length === 0) {
+      thead.innerHTML = "";
+      tbody.innerHTML = "";
       return;
     }
 
-    datatable = new DataTable("#report-table", {
-      processing: true,
-      serverSide: true,
-      ajax: {
-        url: M.cfg.wwwroot + "/local/mikacustomreport/get_report_data.php",
-        type: "POST",
-        contentType: "application/json",
-        data: function (d) {
-          const fields = getSelectedFields();
-          return JSON.stringify({
-            draw: d.draw,
-            start: d.start,
-            length: d.length,
-            user: fields.user,
-            activity: fields.activity,
-          });
-        },
-        dataSrc: function (json) {
-          if (!datatable && json.data.length > 0) {
-            const dynamicCols = Object.keys(json.data[0]).map((key) => ({
-              data: key,
-              title: key,
-            }));
-            renderTableHeader(dynamicCols);
-          } else if (json.data.length === 0) {
-            renderTableHeader([{ data: "No Data" }]);
-          }
-          return json.data;
-        },
-        error: function (xhr, error, thrown) {
-          console.error("AJAX Error:", error, thrown);
-          console.log(xhr.responseText);
-        },
+    // DataTables'ı kullanmadan manuel olarak tablo oluşturalım
+    $.ajax({
+      url: M.cfg.wwwroot + "/local/mikacustomreport/get_report_data.php",
+      type: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({
+        draw: 1,
+        start: 0,
+        length: 100, // Daha fazla veri göster
+        user: selected.user,
+        activity: selected.activity,
+      }),
+      success: function (response) {
+        console.log("Received data:", response);
+
+        if (response.data && response.data.length > 0) {
+          // Başlıkları oluştur
+          const headers = Object.keys(response.data[0]);
+          renderTableHeader(headers);
+
+          // Verileri oluştur
+          renderTableData(response.data);
+        } else {
+          renderTableHeader(["Sonuç"]);
+          renderTableData([]);
+        }
       },
-      columns: allFields.map((f) => ({ data: f, title: f })),
+      error: function (xhr, error, thrown) {
+        console.error("AJAX Error:", error, thrown);
+        console.log(xhr.responseText);
+
+        renderTableHeader(["Hata"]);
+        tbody.innerHTML = `<tr><td>Veri alınırken bir hata oluştu: ${error}</td></tr>`;
+      },
     });
   }
 
