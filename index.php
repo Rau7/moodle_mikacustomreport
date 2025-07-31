@@ -8,10 +8,21 @@ $PAGE->set_context(context_system::instance());
 $PAGE->set_title('Mika Custom Report');
 $PAGE->set_heading('Mika Custom Report');
 
+// jQuery CDN
+$PAGE->requires->js(new moodle_url('https://code.jquery.com/jquery-3.7.0.min.js'), true);
+
 // DataTables CDN
 $PAGE->requires->css(new moodle_url('https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css'));
-$PAGE->requires->js(new moodle_url('https://code.jquery.com/jquery-3.7.0.min.js'), true);
 $PAGE->requires->js(new moodle_url('https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js'), true);
+
+// DataTables Buttons eklentisi
+$PAGE->requires->css(new moodle_url('https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css'));
+$PAGE->requires->js(new moodle_url('https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js'), true);
+$PAGE->requires->js(new moodle_url('https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js'), true);
+$PAGE->requires->js(new moodle_url('https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js'), true);
+$PAGE->requires->js(new moodle_url('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'), true);
+$PAGE->requires->js(new moodle_url('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js'), true);
+$PAGE->requires->js(new moodle_url('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js'), true);
 
 // Custom assets
 $PAGE->requires->css(new moodle_url('/local/mikacustomreport/styles.css'));
@@ -57,7 +68,9 @@ echo $OUTPUT->header();
     </div>
 
     <table id="report-table" class="display" style="width:100%">
-        <thead><tr id="report-head-row"></tr></thead>
+        <thead>
+            <tr></tr>
+        </thead>
         <tbody></tbody>
     </table>
 </div>

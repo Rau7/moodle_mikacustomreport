@@ -1,9 +1,9 @@
-let datatable = null;
+let dataTable = null;
 
 document.addEventListener("DOMContentLoaded", function () {
   const checkboxes = document.querySelectorAll(".field-checkbox");
   const table = document.getElementById("report-table");
-  const thead = table.querySelector("thead");
+  const thead = table.querySelector("thead tr");
   const tbody = table.querySelector("tbody");
 
   function getSelectedFields() {
@@ -22,36 +22,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function renderTableHeader(columns) {
     thead.innerHTML = "";
-    const tr = document.createElement("tr");
     columns.forEach((col) => {
       const th = document.createElement("th");
       th.textContent = col;
-      tr.appendChild(th);
-    });
-    thead.appendChild(tr);
-  }
-
-  function renderTableData(data) {
-    tbody.innerHTML = "";
-
-    if (data.length === 0) {
-      const tr = document.createElement("tr");
-      const td = document.createElement("td");
-      td.textContent = "Veri bulunamadı";
-      td.colSpan = thead.querySelectorAll("th").length || 1;
-      tr.appendChild(td);
-      tbody.appendChild(tr);
-      return;
-    }
-
-    data.forEach((row) => {
-      const tr = document.createElement("tr");
-      Object.values(row).forEach((value) => {
-        const td = document.createElement("td");
-        td.textContent = value !== null ? value : "N/A";
-        tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
+      thead.appendChild(th);
     });
   }
 
@@ -59,13 +33,17 @@ document.addEventListener("DOMContentLoaded", function () {
     const selected = getSelectedFields();
     const allFields = [...selected.user, ...selected.activity];
 
-    if (allFields.length === 0) {
+    if (dataTable) {
+      dataTable.destroy();
       thead.innerHTML = "";
       tbody.innerHTML = "";
+    }
+
+    if (allFields.length === 0) {
       return;
     }
 
-    // DataTables'ı kullanmadan manuel olarak tablo oluşturalım
+    // Önce AJAX çağrısı yaparak verileri alalım
     $.ajax({
       url: M.cfg.wwwroot + "/local/mikacustomreport/get_report_data.php",
       type: "POST",
@@ -73,7 +51,7 @@ document.addEventListener("DOMContentLoaded", function () {
       data: JSON.stringify({
         draw: 1,
         start: 0,
-        length: 100, // Daha fazla veri göster
+        length: 1000,
         user: selected.user,
         activity: selected.activity,
       }),
@@ -81,15 +59,51 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log("Received data:", response);
 
         if (response.data && response.data.length > 0) {
-          // Başlıkları oluştur
+          // Sütun başlıklarını oluştur
           const headers = Object.keys(response.data[0]);
           renderTableHeader(headers);
 
-          // Verileri oluştur
-          renderTableData(response.data);
+          // DataTable'ı başlat
+          dataTable = $("#report-table").DataTable({
+            data: response.data,
+            columns: headers.map((header) => ({ title: header, data: header })),
+            responsive: true,
+            pageLength: 10,
+            lengthMenu: [
+              [5, 10, 25, 50, 100, -1],
+              [5, 10, 25, 50, 100, "Tümü"],
+            ],
+            language: {
+              url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/tr.json",
+            },
+            dom: "Blfrtip", // Buttons, length, filter, table, info, pagination
+            buttons: ["copy", "csv", "excel", "pdf", "print"],
+            // Her sütun için arama kutusu ekle
+            initComplete: function () {
+              var api = this.api();
+
+              // Her sütun için arama kutusu ekle
+              api.columns().every(function (index) {
+                var column = this;
+                var title = $(column.header()).text();
+
+                // Sütun başlığının altına arama kutusu ekle
+                var input = $(
+                  '<input type="text" placeholder="' + title + ' ara" />'
+                )
+                  .appendTo($(column.footer()).empty())
+                  .on("keyup change", function () {
+                    if (column.search() !== this.value) {
+                      column.search(this.value).draw();
+                    }
+                  });
+              });
+            },
+          });
         } else {
           renderTableHeader(["Sonuç"]);
-          renderTableData([]);
+          tbody.innerHTML =
+            "<tr><td>Seçilen kriterlere uygun veri bulunamadı</td></tr>";
         }
       },
       error: function (xhr, error, thrown) {
