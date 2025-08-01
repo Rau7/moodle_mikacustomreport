@@ -5,24 +5,16 @@ require_capability('local/mikacustomreport:view', context_system::instance());
 
 header('Content-Type: application/json');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['error' => 'Method Not Allowed']);
-    exit;
-}
-
+// POST verilerini al
 $data = json_decode(file_get_contents('php://input'), true);
 global $DB;
 
-
-
-// Debug için error handling ekle
 try {
-    $draw = intval($data['draw'] ?? 1);
-    $start = intval($data['start'] ?? 0);
-    $length = intval($data['length'] ?? 10);
+    // Hangi fieldlar seçilmiş kontrol et
+    $hasUserFields = !empty($data['user']) && is_array($data['user']);
+    $hasActivityFields = !empty($data['activity']) && is_array($data['activity']);
 
-    // Field mappings - user.name gibi özel fieldlar için
+    // Field mappings - SQL ifadeleri
     $fieldmaps = [
         'user' => [
             'username' => 'u.username',
@@ -44,7 +36,7 @@ try {
         ],
         'activity' => [
             'activityname' => 'c.fullname AS activityname',
-            'name' => 'c.fullname AS name', // course.name için
+            'name' => 'c.fullname AS name',
             'fullname' => 'c.fullname AS fullname',
             'shortname' => 'c.shortname',
             'category' => 'cc.name AS category',
@@ -63,17 +55,8 @@ try {
         ]
     ];
 
+    // SELECT fieldları oluştur
     $selects = [];
-    $joins = "";
-    $where = "u.deleted = 0 AND u.suspended = 0";
-    $params = [];
-    $from = 'cbd_user u';
-
-    // Hangi fieldlar seçilmiş kontrol et
-    $hasUserFields = !empty($data['user']) && is_array($data['user']);
-    $hasActivityFields = !empty($data['activity']) && is_array($data['activity']);
-
-    // User fields ekle
     if ($hasUserFields) {
         foreach ($data['user'] as $field) {
             if (isset($fieldmaps['user'][$field])) {
@@ -81,15 +64,8 @@ try {
             }
         }
     }
-   
-    // Activity fields ekle - JOIN gerekiyorsa ekle
+    
     if ($hasActivityFields) {
-        $joins = " JOIN cbd_user_enrolments ue ON ue.userid = u.id";
-        $joins .= " JOIN cbd_enrol e ON e.id = ue.enrolid";
-        $joins .= " JOIN cbd_course c ON c.id = e.courseid";
-        $joins .= " LEFT JOIN cbd_course_categories cc ON cc.id = c.category";
-        $joins .= " LEFT JOIN cbd_course_completions ccmp ON ccmp.userid = u.id AND ccmp.course = c.id";
-
         foreach ($data['activity'] as $field) {
             if (isset($fieldmaps['activity'][$field])) {
                 $selects[] = $fieldmaps['activity'][$field];
@@ -104,33 +80,42 @@ try {
     }
 
     // SQL oluştur
-    $sql = "SELECT " . implode(", ", $selects) . " FROM $from$joins WHERE $where";
+    $from = 'cbd_user u';
+    $joins = '';
+    $where = 'u.deleted = 0'; // Silinmemiş kullanıcılar
     
-    // Sıralama - activity varsa karışık sıralama, yoksa user sıralaması
+    // Activity fields varsa JOIN ekle
     if ($hasActivityFields) {
-        $sql .= " ORDER BY u.id DESC, c.id DESC";
+        $joins = ' JOIN cbd_user_enrolments ue ON ue.userid = u.id';
+        $joins .= ' JOIN cbd_enrol e ON e.id = ue.enrolid';
+        $joins .= ' JOIN cbd_course c ON c.id = e.courseid';
+        $joins .= ' LEFT JOIN cbd_course_categories cc ON cc.id = c.category';
+        $joins .= ' LEFT JOIN cbd_course_completions ccmp ON ccmp.userid = u.id AND ccmp.course = c.id';
+    }
+
+    // Final SQL
+    $selectClause = implode(', ', $selects);
+    $sql = "SELECT $selectClause FROM $from$joins WHERE $where";
+    
+    // Sıralama ekle
+    if ($hasActivityFields) {
+        $sql .= ' ORDER BY u.username, c.fullname';
     } else {
-        $sql .= " ORDER BY u.id DESC";
+        $sql .= ' ORDER BY u.username';
     }
 
     // Debug için SQL'i logla
     error_log("Custom Report SQL: " . $sql);
+    error_log("Has User Fields: " . ($hasUserFields ? 'Yes' : 'No'));
+    error_log("Has Activity Fields: " . ($hasActivityFields ? 'Yes' : 'No'));
+    error_log("Joins: " . $joins);
 
-    // Count hesapla
-    // Doğrudan SQL ile sayım yap
-    $totalcount = $DB->count_records_sql("SELECT COUNT(*) FROM cbd_user WHERE deleted = 0 AND suspended = 0");
+    // Tüm verileri çek - recordset kullanıyoruz çünkü get_records_sql sınırlayabilir
+    $recordset = $DB->get_recordset_sql($sql);
     
-    // Filtered count - aynı WHERE condition ile
-    $countSql = "SELECT COUNT(DISTINCT u.id) FROM $from$joins WHERE $where";
-    $filteredcount = $DB->count_records_sql($countSql, $params);
-
-    
-    // Veriyi çek
-    $records = $DB->get_records_sql($sql, $params, $start, $length);
-    
-    // Output hazırla
+    // Output formatla
     $output = [];
-    foreach ($records as $record) {
+    foreach ($recordset as $record) {
         $row = [];
         foreach ($record as $key => $value) {
             // Timestamp alanlarını formatla
@@ -142,37 +127,36 @@ try {
         }
         $output[] = $row;
     }
-
     
+    // Recordset'i kapat
+    $recordset->close();
+    
+    // Toplam kayıt sayısı
+    $totalCount = count($output);
+
     // Response
     echo json_encode([
-        'draw' => $draw,
-        'recordsTotal' => $totalcount,
-        'recordsFiltered' => $filteredcount,
+        'draw' => 1,
+        'recordsTotal' => $totalCount,
+        'recordsFiltered' => $totalCount,
         'data' => $output,
         'debug' => [
             'sql' => $sql,
+            'totalCount' => $totalCount,
             'hasUserFields' => $hasUserFields,
             'hasActivityFields' => $hasActivityFields,
-            'selectedFields' => $selects,
-            'recordCount' => count($records)
+            'selectedFields' => $selects
         ]
     ]);
 
 } catch (Exception $e) {
-    // Hata durumunda detaylı bilgi ver
     error_log("Custom Report Error: " . $e->getMessage());
     echo json_encode([
-        'draw' => $draw ?? 1,
+        'draw' => 1,
         'recordsTotal' => 0,
         'recordsFiltered' => 0,
         'data' => [],
-        'error' => $e->getMessage(),
-        'debug' => [
-            'line' => $e->getLine(),
-            'file' => $e->getFile(),
-            'trace' => $e->getTraceAsString()
-        ]
+        'error' => $e->getMessage()
     ]);
 }
 ?>
