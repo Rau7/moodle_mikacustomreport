@@ -247,6 +247,16 @@ document.addEventListener("DOMContentLoaded", function () {
               },
               columns: response.columns,
               responsive: true,
+              scrollX: true,
+              scrollCollapse: true,
+              autoWidth: false,
+              columnDefs: [
+                {
+                  targets: "_all",
+                  className: "dt-nowrap",
+                  width: "auto",
+                },
+              ],
               pageLength: 10,
               lengthMenu: [
                 [5, 10, 25, 50, 100],
@@ -258,7 +268,43 @@ document.addEventListener("DOMContentLoaded", function () {
                 loadingRecords: "Kayıtlar yükleniyor...",
               },
               dom: "Blfrtip",
-              buttons: ["copy", "csv", "excel", "pdf", "print"],
+              buttons: [
+                {
+                  extend: "copy",
+                  text: "Kopyala",
+                  action: function (e, dt, node, config) {
+                    exportAllData("copy");
+                  },
+                },
+                {
+                  extend: "csv",
+                  text: "CSV İndir",
+                  action: function (e, dt, node, config) {
+                    exportAllData("csv");
+                  },
+                },
+                {
+                  extend: "excel",
+                  text: "Excel İndir",
+                  action: function (e, dt, node, config) {
+                    exportAllData("excel");
+                  },
+                },
+                {
+                  extend: "pdf",
+                  text: "PDF İndir",
+                  action: function (e, dt, node, config) {
+                    exportAllData("pdf");
+                  },
+                },
+                {
+                  extend: "print",
+                  text: "Yazdır",
+                  action: function (e, dt, node, config) {
+                    exportAllData("print");
+                  },
+                },
+              ],
               // Sütun bazlı arama için footer ekle
               initComplete: function () {
                 var api = this.api();
@@ -298,6 +344,219 @@ document.addEventListener("DOMContentLoaded", function () {
 
         renderTableHeader(["Hata"]);
         tbody.innerHTML = `<tr><td>Veri alınırken bir hata oluştu: ${error}</td></tr>`;
+      },
+    });
+  }
+
+  // Export all data function
+  window.exportAllData = function (format) {
+    const selected = getSelectedFields();
+    const allFields = [...selected.user, ...selected.activity];
+
+    if (allFields.length === 0) {
+      alert("Lütfen önce export edilecek alanları seçin.");
+      return;
+    }
+
+    console.log("Exporting all data in format:", format);
+
+    // Get current search value from DataTable
+    let searchValue = "";
+    if (dataTable) {
+      searchValue = dataTable.search();
+    }
+
+    const exportData = {
+      user: selected.user,
+      activity: selected.activity,
+      format: format,
+      search: searchValue,
+    };
+
+    if (format === "copy") {
+      // Copy için özel işlem
+      copyAllDataToClipboard(exportData);
+    } else if (format === "print") {
+      // Print için özel işlem
+      printAllData(exportData);
+    } else {
+      // File download için
+      downloadAllData(exportData);
+    }
+  };
+
+  // Download all data
+  function downloadAllData(exportData) {
+    // Loading göster
+    console.log("Starting download export...");
+
+    // Export butonunu geçici olarak disable et
+    $(".dt-button").prop("disabled", true).addClass("disabled");
+
+    // Loading mesajı göster
+    if (dataTable) {
+      const tableContainer = $(dataTable.table().container());
+      tableContainer.find(".dataTables_processing").show();
+    }
+
+    // Create a temporary form for file download
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = M.cfg.wwwroot + "/local/mikacustomreport/export_report.php";
+    form.style.display = "none";
+
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "data";
+    input.value = JSON.stringify(exportData);
+
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    form.submit();
+
+    // Form'u temizle ve loading'i kapat
+    setTimeout(() => {
+      document.body.removeChild(form);
+
+      // Export butonlarını tekrar aktif et
+      $(".dt-button").prop("disabled", false).removeClass("disabled");
+
+      // Loading mesajını gizle
+      if (dataTable) {
+        const tableContainer = $(dataTable.table().container());
+        tableContainer.find(".dataTables_processing").hide();
+      }
+
+      console.log("Export completed");
+    }, 1000);
+  }
+
+  // Copy all data to clipboard
+  function copyAllDataToClipboard(exportData) {
+    // AJAX ile tüm veriyi al ve clipboard'a kopyala
+    $.ajax({
+      url: M.cfg.wwwroot + "/local/mikacustomreport/get_report_data.php",
+      type: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({
+        draw: 1,
+        start: 0,
+        length: -1, // Tüm veriyi al
+        search: { value: exportData.search },
+        user: exportData.user,
+        activity: exportData.activity,
+      }),
+      success: function (response) {
+        if (response.data && response.data.length > 0) {
+          // CSV formatında string oluştur
+          const headers = Object.keys(response.data[0]);
+          let csvContent = headers.join("\t") + "\n";
+
+          response.data.forEach((row) => {
+            const values = headers.map((header) => row[header] || "");
+            csvContent += values.join("\t") + "\n";
+          });
+
+          // Clipboard'a kopyala
+          navigator.clipboard
+            .writeText(csvContent)
+            .then(() => {
+              alert(`${response.data.length} kayıt panoya kopyalandı!`);
+            })
+            .catch((err) => {
+              console.error("Clipboard error:", err);
+              alert("Panoya kopyalama başarısız!");
+            });
+        } else {
+          alert("Kopyalanacak veri bulunamadı!");
+        }
+      },
+      error: function (xhr, error) {
+        console.error("Copy export error:", error);
+        alert("Veri kopyalanırken hata oluştu!");
+      },
+    });
+  }
+
+  // Print all data
+  function printAllData(exportData) {
+    // AJAX ile tüm veriyi al ve print et
+    $.ajax({
+      url: M.cfg.wwwroot + "/local/mikacustomreport/get_report_data.php",
+      type: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({
+        draw: 1,
+        start: 0,
+        length: -1, // Tüm veriyi al
+        search: { value: exportData.search },
+        user: exportData.user,
+        activity: exportData.activity,
+      }),
+      success: function (response) {
+        if (response.data && response.data.length > 0) {
+          // Print penceresi oluştur
+          const printWindow = window.open("", "_blank");
+          const headers = Object.keys(response.data[0]);
+
+          let htmlContent = `
+            <html>
+              <head>
+                <title>Mika Custom Report</title>
+                <style>
+                  body { font-family: Arial, sans-serif; margin: 20px; }
+                  table { border-collapse: collapse; width: 100%; }
+                  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                  th { background-color: #f2f2f2; font-weight: bold; }
+                  tr:nth-child(even) { background-color: #f9f9f9; }
+                  h1 { color: #333; }
+                </style>
+              </head>
+              <body>
+                <h1>Mika Custom Report</h1>
+                <p>Toplam Kayıt: ${response.data.length}</p>
+                <p>Tarih: ${new Date().toLocaleString("tr-TR")}</p>
+                <table>
+                  <thead>
+                    <tr>
+          `;
+
+          headers.forEach((header) => {
+            htmlContent += `<th>${header}</th>`;
+          });
+
+          htmlContent += `
+                    </tr>
+                  </thead>
+                  <tbody>
+          `;
+
+          response.data.forEach((row) => {
+            htmlContent += "<tr>";
+            headers.forEach((header) => {
+              htmlContent += `<td>${row[header] || ""}</td>`;
+            });
+            htmlContent += "</tr>";
+          });
+
+          htmlContent += `
+                  </tbody>
+                </table>
+              </body>
+            </html>
+          `;
+
+          printWindow.document.write(htmlContent);
+          printWindow.document.close();
+          printWindow.print();
+        } else {
+          alert("Yazdırılacak veri bulunamadı!");
+        }
+      },
+      error: function (xhr, error) {
+        console.error("Print export error:", error);
+        alert("Yazdırma sırasında hata oluştu!");
       },
     });
   }

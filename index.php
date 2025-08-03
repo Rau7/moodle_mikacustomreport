@@ -80,8 +80,8 @@ echo $OUTPUT->header();
                         <option value="startdate">Başlangıç Tarihi</option>
                         <option value="enddate">Bitiş Tarihi</option>
                         <option value="format">Format</option>
-                        <option value="completionenabled">Tamamlama Etkin</option>
-                        <option value="guestaccess">Misafir Erişimi</option>
+                        <!--<option value="completionenabled">Tamamlama Etkin</option>-->
+                        <!--<option value="guestaccess">Misafir Erişimi</option>-->
                     </select>
                 </div>
             </div>

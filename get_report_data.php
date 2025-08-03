@@ -49,10 +49,13 @@ try {
             'shortname' => 'c.shortname',
             'category' => 'cc.name AS category',
             'registrationdate' => 'ue.timecreated AS registrationdate',
-            'progress' => 'COALESCE(ccmp.progress, 0) AS progress',
+            'progress' => 'CASE 
+                WHEN COALESCE(cstats.total_activities, 0) = 0 THEN 0
+                ELSE ROUND(COALESCE(cstats.completed_activities, 0) * 100.0 / cstats.total_activities, 1)
+            END AS progress',
             'completionstatus' => 'CASE WHEN ccmp.timecompleted IS NOT NULL THEN "Completed" ELSE "Not Completed" END AS completionstatus',
-            'activitiescompleted' => '(SELECT COUNT(*) FROM cbd_course_modules_completion cmc WHERE cmc.userid = u.id AND cmc.completionstate = 1 AND cmc.course = c.id) AS activitiescompleted',
-            'totalactivities' => '(SELECT COUNT(*) FROM cbd_course_modules cm WHERE cm.course = c.id) AS totalactivities',
+            'activitiescompleted' => 'COALESCE(cstats.completed_activities, 0) AS activitiescompleted',
+            'totalactivities' => 'COALESCE(cstats.total_activities, 0) AS totalactivities',
             'completiontime' => 'SEC_TO_TIME(ccmp.timecompleted - ue.timecreated) AS completiontime',
             'activitytimespent' => '(SELECT SEC_TO_TIME(COALESCE(logsure.total_time, 0)) FROM (SELECT t.userid, t.courseid, SUM(LEAST(t.diff, 1800)) AS total_time FROM (SELECT userid, courseid, LEAD(timecreated) OVER (PARTITION BY userid, courseid ORDER BY timecreated) - timecreated AS diff FROM cbd_logstore_standard_log WHERE action="viewed" AND target="course") AS t WHERE t.diff > 0 GROUP BY t.userid, t.courseid) AS logsure WHERE logsure.userid = u.id AND logsure.courseid = c.id) AS activitytimespent',
             'startdate' => 'c.startdate',
@@ -127,6 +130,23 @@ try {
         $joins .= ' JOIN cbd_course c ON c.id = e.courseid';
         $joins .= ' LEFT JOIN cbd_course_categories cc ON cc.id = c.category';
         $joins .= ' LEFT JOIN cbd_course_completions ccmp ON ccmp.userid = u.id AND ccmp.course = c.id';
+        
+        // Performance optimized JOIN for completion statistics
+        $joins .= ' LEFT JOIN (
+            SELECT 
+                u2.id as userid,
+                c2.id as courseid,
+                COUNT(CASE WHEN cmc.completionstate >= 1 THEN 1 END) as completed_activities,
+                COUNT(cm.id) as total_activities
+            FROM cbd_user u2
+            JOIN cbd_user_enrolments ue2 ON ue2.userid = u2.id
+            JOIN cbd_enrol e2 ON e2.id = ue2.enrolid
+            JOIN cbd_course c2 ON c2.id = e2.courseid
+            JOIN cbd_course_modules cm ON cm.course = c2.id AND cm.completion > 0
+            LEFT JOIN cbd_course_modules_completion cmc ON cmc.coursemoduleid = cm.id AND cmc.userid = u2.id
+            WHERE u2.deleted = 0
+            GROUP BY u2.id, c2.id
+        ) cstats ON cstats.userid = u.id AND cstats.courseid = c.id';
     }
 
     // Arama filtresi ekle
@@ -226,9 +246,12 @@ try {
     $countSql = "SELECT COUNT(*) as total FROM $from$joins WHERE $where$searchWhere";
     $dataSql = "SELECT $selectClause FROM $from$joins WHERE $where$searchWhere$orderBy";
     
-    // LIMIT ve OFFSET ekle
+    // LIMIT ve OFFSET ekle (length: -1 ise tüm veriyi döndür)
     if ($length > 0) {
         $dataSql .= " LIMIT $length OFFSET $start";
+    } elseif ($length == -1) {
+        // Export için tüm veriyi döndür, LIMIT yok
+        error_log("Exporting all data, no LIMIT applied");
     }
 
     // Debug için SQL'i logla
