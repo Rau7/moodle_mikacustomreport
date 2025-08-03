@@ -212,3 +212,11 @@
 #report-table {
   margin-top: 20px;
 }
+
+.select2-selection__choice__display {
+  padding-left: 15px !important;
+}
+
+.select2-selection__choice__remove {
+  margin-top: 3px !important;
+}

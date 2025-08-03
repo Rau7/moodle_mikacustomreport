@@ -169,15 +169,33 @@ document.addEventListener("DOMContentLoaded", function () {
     const selected = getSelectedFields();
     const allFields = [...selected.user, ...selected.activity];
 
+    console.log("rebuildDataTable called with:", {
+      userFields: selected.user,
+      activityFields: selected.activity,
+      totalFields: allFields.length,
+    });
+
+    // DataTable'ı temizle
     if (dataTable) {
+      console.log("Destroying existing DataTable");
       dataTable.destroy();
-      thead.innerHTML = "";
-      tbody.innerHTML = "";
+      dataTable = null;
     }
 
+    // Tablo içeriğini temizle
+    thead.innerHTML = "";
+    tbody.innerHTML = "";
+
+    // Eğer hiç alan seçilmemişse tabloyu gizle
     if (allFields.length === 0) {
+      console.log("No fields selected, hiding table");
+      $("#report-table").hide();
       return;
     }
+
+    console.log("Fields selected, showing table and fetching data");
+    // Tabloyu göster
+    $("#report-table").show();
 
     // İlk olarak sütun başlıklarını almak için küçük bir örnek veri çekelim
     $.ajax({
@@ -200,71 +218,78 @@ document.addEventListener("DOMContentLoaded", function () {
           renderTableHeader(response.columns.map((col) => col.title));
 
           // DataTable'ı server-side processing ile başlat
-          dataTable = $("#report-table").DataTable({
-            processing: true,
-            serverSide: true,
-            ajax: {
-              url:
-                M.cfg.wwwroot + "/local/mikacustomreport/get_report_data.php",
-              type: "POST",
-              contentType: "application/json",
-              data: function (d) {
-                // DataTables parametrelerini backend'e gönder
-                return JSON.stringify({
-                  draw: d.draw,
-                  start: d.start,
-                  length: d.length,
-                  search: d.search,
-                  order: d.order,
-                  columns: d.columns,
-                  user: selected.user,
-                  activity: selected.activity,
+          try {
+            dataTable = $("#report-table").DataTable({
+              processing: true,
+              serverSide: true,
+              ajax: {
+                url:
+                  M.cfg.wwwroot + "/local/mikacustomreport/get_report_data.php",
+                type: "POST",
+                contentType: "application/json",
+                data: function (d) {
+                  // DataTables parametrelerini backend'e gönder
+                  return JSON.stringify({
+                    draw: d.draw,
+                    start: d.start,
+                    length: d.length,
+                    search: d.search,
+                    order: d.order,
+                    columns: d.columns,
+                    user: selected.user,
+                    activity: selected.activity,
+                  });
+                },
+                dataSrc: function (json) {
+                  // Backend'den gelen veriyi DataTables formatına çevir
+                  return json.data;
+                },
+              },
+              columns: response.columns,
+              responsive: true,
+              pageLength: 10,
+              lengthMenu: [
+                [5, 10, 25, 50, 100],
+                [5, 10, 25, 50, 100],
+              ],
+              language: {
+                url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/tr.json",
+                processing: "Veriler yükleniyor...",
+                loadingRecords: "Kayıtlar yükleniyor...",
+              },
+              dom: "Blfrtip",
+              buttons: ["copy", "csv", "excel", "pdf", "print"],
+              // Sütun bazlı arama için footer ekle
+              initComplete: function () {
+                var api = this.api();
+
+                // Her sütun için arama kutusu ekle
+                api.columns().every(function (index) {
+                  var column = this;
+                  var title = $(column.header()).text();
+
+                  var input = $(
+                    '<input type="text" placeholder="' + title + ' ara" />'
+                  )
+                    .appendTo($(column.footer()).empty())
+                    .on("keyup change clear", function () {
+                      if (column.search() !== this.value) {
+                        column.search(this.value).draw();
+                      }
+                    });
                 });
               },
-              dataSrc: function (json) {
-                // Backend'den gelen veriyi DataTables formatına çevir
-                return json.data;
-              },
-            },
-            columns: response.columns,
-            responsive: true,
-            pageLength: 10,
-            lengthMenu: [
-              [5, 10, 25, 50, 100],
-              [5, 10, 25, 50, 100],
-            ],
-            language: {
-              url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/tr.json",
-              processing: "Veriler yükleniyor...",
-              loadingRecords: "Kayıtlar yükleniyor...",
-            },
-            dom: "Blfrtip",
-            buttons: ["copy", "csv", "excel", "pdf", "print"],
-            // Sütun bazlı arama için footer ekle
-            initComplete: function () {
-              var api = this.api();
-
-              // Her sütun için arama kutusu ekle
-              api.columns().every(function (index) {
-                var column = this;
-                var title = $(column.header()).text();
-
-                var input = $(
-                  '<input type="text" placeholder="' + title + ' ara" />'
-                )
-                  .appendTo($(column.footer()).empty())
-                  .on("keyup change clear", function () {
-                    if (column.search() !== this.value) {
-                      column.search(this.value).draw();
-                    }
-                  });
-              });
-            },
-          });
+            });
+          } catch (error) {
+            console.error("DataTable creation error:", error);
+            renderTableHeader(["Hata"]);
+            tbody.innerHTML = `<tr><td>Tablo oluşturulurken hata oluştu: ${error.message}</td></tr>`;
+          }
         } else {
-          renderTableHeader(["Sonuç"]);
+          console.warn("No columns received from server");
+          renderTableHeader(["Uyarı"]);
           tbody.innerHTML =
-            "<tr><td>Seçilen kriterlere uygun veri bulunamadı</td></tr>";
+            "<tr><td>Seçilen kriterlere uygun sütun bulunamadı</td></tr>";
         }
       },
       error: function (xhr, error, thrown) {
