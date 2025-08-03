@@ -1,23 +1,159 @@
 let dataTable = null;
+let selectedFields = { user: [], activity: [] };
+
+// Field labels mapping
+const fieldLabels = {
+  user: {
+    username: "Kullanıcı Adı",
+    email: "E-posta",
+    firstname: "Ad",
+    lastname: "Soyad",
+    timespent: "Sitede Geçirilen Zaman",
+    start: "Başlangıç Tarihi (Özel)",
+    bolum: "Bölüm (Özel)",
+    end: "Bitiş Tarihi (Özel)",
+    department: "Departman",
+    position: "Pozisyon (Özel)",
+    institution: "Kurum",
+    address: "Adres",
+    city: "Şehir",
+    lastaccess: "Son Erişim",
+    firstaccess: "İlk Erişim",
+    timecreated: "Hesap Oluşturma Tarihi",
+  },
+  activity: {
+    activityname: "Etkinlik Adı",
+    category: "Kategori",
+    registrationdate: "Kayıt Tarihi",
+    progress: "İlerleme (%)",
+    completionstatus: "Tamamlanma Durumu",
+    activitiescompleted: "Tamamlanan Aktiviteler",
+    totalactivities: "Toplam Aktiviteler",
+    completiontime: "Tamamlanma Süresi",
+    activitytimespent: "Etkinlikte Geçirilen Zaman",
+    startdate: "Başlangıç Tarihi",
+    enddate: "Bitiş Tarihi",
+    format: "Format",
+    completionenabled: "Tamamlama Etkin",
+    guestaccess: "Misafir Erişimi",
+  },
+};
 
 document.addEventListener("DOMContentLoaded", function () {
-  const checkboxes = document.querySelectorAll(".field-checkbox");
   const table = document.getElementById("report-table");
   const thead = table.querySelector("thead tr");
   const tbody = table.querySelector("tbody");
 
-  function getSelectedFields() {
-    const userFields = [];
-    const activityFields = [];
+  // Initialize Select2 dropdowns
+  initializeSelect2();
 
-    checkboxes.forEach((cb) => {
-      if (cb.checked) {
-        if (cb.dataset.type === "user") userFields.push(cb.value);
-        else if (cb.dataset.type === "activity") activityFields.push(cb.value);
-      }
+  function getSelectedFields() {
+    return selectedFields;
+  }
+
+  // Initialize Select2 dropdowns
+  function initializeSelect2() {
+    // User fields dropdown
+    $("#user-fields-select")
+      .select2({
+        placeholder: "Kullanıcı alanlarını seçin...",
+        allowClear: true,
+        width: "100%",
+      })
+      .on("change", function () {
+        selectedFields.user = $(this).val() || [];
+        updateSelectedFieldsDisplay();
+        rebuildDataTable();
+      });
+
+    // Activity fields dropdown
+    $("#activity-fields-select")
+      .select2({
+        placeholder: "Etkinlik alanlarını seçin...",
+        allowClear: true,
+        width: "100%",
+      })
+      .on("change", function () {
+        selectedFields.activity = $(this).val() || [];
+        updateSelectedFieldsDisplay();
+        rebuildDataTable();
+      });
+
+    // Clear all fields button
+    $("#clear-all-fields").on("click", function () {
+      clearAllFields();
+    });
+  }
+
+  // Update selected fields display
+  function updateSelectedFieldsDisplay() {
+    const displayContainer = document.getElementById("selected-fields-display");
+    const clearButton = document.getElementById("clear-all-fields");
+
+    // Get all selected fields
+    const allSelected = [...selectedFields.user, ...selectedFields.activity];
+
+    if (allSelected.length === 0) {
+      displayContainer.innerHTML =
+        '<p class="no-fields-message">Henüz alan seçilmedi. Yukarıdaki dropdown\'lardan alanları seçin.</p>';
+      clearButton.style.display = "none";
+      return;
+    }
+
+    clearButton.style.display = "inline-block";
+
+    let html = "";
+
+    // Add user fields
+    selectedFields.user.forEach((field) => {
+      const label = fieldLabels.user[field] || field;
+      html += `
+        <span class="selected-field-tag">
+          <span class="field-type">Kullanıcı</span>
+          ${label}
+          <button class="remove-field" onclick="removeField('user', '${field}')" title="Kaldır">
+            ×
+          </button>
+        </span>
+      `;
     });
 
-    return { user: userFields, activity: activityFields };
+    // Add activity fields
+    selectedFields.activity.forEach((field) => {
+      const label = fieldLabels.activity[field] || field;
+      html += `
+        <span class="selected-field-tag">
+          <span class="field-type">Etkinlik</span>
+          ${label}
+          <button class="remove-field" onclick="removeField('activity', '${field}')" title="Kaldır">
+            ×
+          </button>
+        </span>
+      `;
+    });
+
+    displayContainer.innerHTML = html;
+  }
+
+  // Remove individual field
+  window.removeField = function (type, field) {
+    const index = selectedFields[type].indexOf(field);
+    if (index > -1) {
+      selectedFields[type].splice(index, 1);
+
+      // Update Select2 selection
+      $(`#${type}-fields-select`).val(selectedFields[type]).trigger("change");
+    }
+  };
+
+  // Clear all fields
+  function clearAllFields() {
+    selectedFields.user = [];
+    selectedFields.activity = [];
+
+    // Clear Select2 selections
+    $("#user-fields-select").val(null).trigger("change");
+    $("#activity-fields-select").val(null).trigger("change");
   }
 
   function renderTableHeader(columns) {
@@ -141,7 +277,6 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  checkboxes.forEach((cb) => {
-    cb.addEventListener("change", rebuildDataTable);
-  });
+  // Initialize the interface
+  updateSelectedFieldsDisplay();
 });
