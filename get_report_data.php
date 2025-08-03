@@ -10,6 +10,14 @@ $data = json_decode(file_get_contents('php://input'), true);
 global $DB;
 
 try {
+    // DataTables server-side processing parametreleri
+    $draw = isset($data['draw']) ? intval($data['draw']) : 1;
+    $start = isset($data['start']) ? intval($data['start']) : 0;
+    $length = isset($data['length']) ? intval($data['length']) : 10;
+    $search = isset($data['search']['value']) ? $data['search']['value'] : '';
+    $order = isset($data['order']) ? $data['order'] : [];
+    $getColumns = isset($data['getColumns']) ? $data['getColumns'] : false;
+    
     // Hangi fieldlar seçilmiş kontrol et
     $hasUserFields = !empty($data['user']) && is_array($data['user']);
     $hasActivityFields = !empty($data['activity']) && is_array($data['activity']);
@@ -79,6 +87,34 @@ try {
         $selects[] = 'u.email';
     }
 
+    // Eğer sadece sütun bilgisi isteniyorsa
+    if ($getColumns) {
+        $columns = [];
+        if ($hasUserFields) {
+            foreach ($data['user'] as $field) {
+                if (isset($fieldmaps['user'][$field])) {
+                    $columns[] = ['data' => $field, 'title' => ucfirst(str_replace('_', ' ', $field))];
+                }
+            }
+        }
+        if ($hasActivityFields) {
+            foreach ($data['activity'] as $field) {
+                if (isset($fieldmaps['activity'][$field])) {
+                    $columns[] = ['data' => $field, 'title' => ucfirst(str_replace('_', ' ', $field))];
+                }
+            }
+        }
+        
+        echo json_encode([
+            'draw' => $draw,
+            'columns' => $columns,
+            'recordsTotal' => 0,
+            'recordsFiltered' => 0,
+            'data' => []
+        ]);
+        return;
+    }
+
     // SQL oluştur
     $from = 'cbd_user u';
     $joins = '';
@@ -93,25 +129,118 @@ try {
         $joins .= ' LEFT JOIN cbd_course_completions ccmp ON ccmp.userid = u.id AND ccmp.course = c.id';
     }
 
+    // Arama filtresi ekle
+    $searchWhere = '';
+    $searchParams = [];
+    if (!empty($search)) {
+        $searchConditions = [];
+        $searchValue = '%' . $search . '%';
+        
+        // Her seçili field'da arama yap
+        if ($hasUserFields) {
+            foreach ($data['user'] as $field) {
+                if (isset($fieldmaps['user'][$field])) {
+                    $fieldExpr = $fieldmaps['user'][$field];
+                    // AS kısmını çıkar
+                    if (strpos($fieldExpr, ' AS ') !== false) {
+                        $fieldExpr = substr($fieldExpr, 0, strpos($fieldExpr, ' AS '));
+                    }
+                    $searchConditions[] = "LOWER($fieldExpr) LIKE LOWER(:search$field)";
+                    $searchParams["search$field"] = $searchValue;
+                }
+            }
+        }
+        
+        if ($hasActivityFields) {
+            foreach ($data['activity'] as $field) {
+                if (isset($fieldmaps['activity'][$field])) {
+                    $fieldExpr = $fieldmaps['activity'][$field];
+                    // AS kısmını çıkar
+                    if (strpos($fieldExpr, ' AS ') !== false) {
+                        $fieldExpr = substr($fieldExpr, 0, strpos($fieldExpr, ' AS '));
+                    }
+                    $searchConditions[] = "LOWER($fieldExpr) LIKE LOWER(:search$field)";
+                    $searchParams["search$field"] = $searchValue;
+                }
+            }
+        }
+        
+        if (!empty($searchConditions)) {
+            $searchWhere = ' AND (' . implode(' OR ', $searchConditions) . ')';
+        }
+    }
+
+    // Sıralama ekle
+    $orderBy = '';
+    if (!empty($order)) {
+        $orderConditions = [];
+        foreach ($order as $orderItem) {
+            $columnIndex = intval($orderItem['column']);
+            $direction = $orderItem['dir'] === 'desc' ? 'DESC' : 'ASC';
+            
+            // Sütun indeksine göre field adını bul
+            $fieldIndex = 0;
+            $orderField = null;
+            
+            if ($hasUserFields) {
+                foreach ($data['user'] as $field) {
+                    if ($fieldIndex == $columnIndex) {
+                        $orderField = $field;
+                        break;
+                    }
+                    $fieldIndex++;
+                }
+            }
+            
+            if (!$orderField && $hasActivityFields) {
+                foreach ($data['activity'] as $field) {
+                    if ($fieldIndex == $columnIndex) {
+                        $orderField = $field;
+                        break;
+                    }
+                    $fieldIndex++;
+                }
+            }
+            
+            if ($orderField) {
+                $orderConditions[] = "$orderField $direction";
+            }
+        }
+        
+        if (!empty($orderConditions)) {
+            $orderBy = ' ORDER BY ' . implode(', ', $orderConditions);
+        }
+    }
+    
+    // Default sıralama
+    if (empty($orderBy)) {
+        if ($hasActivityFields) {
+            $orderBy = ' ORDER BY u.username, c.fullname';
+        } else {
+            $orderBy = ' ORDER BY u.username';
+        }
+    }
+
     // Final SQL
     $selectClause = implode(', ', $selects);
-    $sql = "SELECT $selectClause FROM $from$joins WHERE $where";
+    $countSql = "SELECT COUNT(*) as total FROM $from$joins WHERE $where$searchWhere";
+    $dataSql = "SELECT $selectClause FROM $from$joins WHERE $where$searchWhere$orderBy";
     
-    // Sıralama ekle
-    if ($hasActivityFields) {
-        $sql .= ' ORDER BY u.username, c.fullname';
-    } else {
-        $sql .= ' ORDER BY u.username';
+    // LIMIT ve OFFSET ekle
+    if ($length > 0) {
+        $dataSql .= " LIMIT $length OFFSET $start";
     }
 
     // Debug için SQL'i logla
-    error_log("Custom Report SQL: " . $sql);
-    error_log("Has User Fields: " . ($hasUserFields ? 'Yes' : 'No'));
-    error_log("Has Activity Fields: " . ($hasActivityFields ? 'Yes' : 'No'));
-    error_log("Joins: " . $joins);
+    error_log("Custom Report Count SQL: " . $countSql);
+    error_log("Custom Report Data SQL: " . $dataSql);
+    error_log("Search params: " . print_r($searchParams, true));
 
-    // Tüm verileri çek - recordset kullanıyoruz çünkü get_records_sql sınırlayabilir
-    $recordset = $DB->get_recordset_sql($sql);
+    // Toplam kayıt sayısını al
+    $totalRecords = $DB->get_field_sql($countSql, $searchParams);
+    
+    // Verileri çek
+    $recordset = $DB->get_recordset_sql($dataSql, $searchParams);
     
     // Output formatla
     $output = [];
@@ -130,22 +259,22 @@ try {
     
     // Recordset'i kapat
     $recordset->close();
-    
-    // Toplam kayıt sayısı
-    $totalCount = count($output);
 
     // Response
     echo json_encode([
-        'draw' => 1,
-        'recordsTotal' => $totalCount,
-        'recordsFiltered' => $totalCount,
+        'draw' => $draw,
+        'recordsTotal' => intval($totalRecords),
+        'recordsFiltered' => intval($totalRecords), // Arama sonrası kayıt sayısı
         'data' => $output,
         'debug' => [
-            'sql' => $sql,
-            'totalCount' => $totalCount,
+            'countSql' => $countSql,
+            'dataSql' => $dataSql,
+            'totalRecords' => $totalRecords,
+            'start' => $start,
+            'length' => $length,
+            'search' => $search,
             'hasUserFields' => $hasUserFields,
-            'hasActivityFields' => $hasActivityFields,
-            'selectedFields' => $selects
+            'hasActivityFields' => $hasActivityFields
         ]
     ]);
 

@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    // Önce AJAX çağrısı yaparak verileri alalım
+    // İlk olarak sütun başlıklarını almak için küçük bir örnek veri çekelim
     $.ajax({
       url: M.cfg.wwwroot + "/local/mikacustomreport/get_report_data.php",
       type: "POST",
@@ -51,34 +51,60 @@ document.addEventListener("DOMContentLoaded", function () {
       data: JSON.stringify({
         draw: 1,
         start: 0,
-        length: 1000,
+        length: 1,
         user: selected.user,
         activity: selected.activity,
+        getColumns: true, // Sadece sütun bilgilerini al
       }),
       success: function (response) {
-        console.log("Received data:", response);
+        console.log("Column info received:", response);
 
-        if (response.data && response.data.length > 0) {
+        if (response.columns && response.columns.length > 0) {
           // Sütun başlıklarını oluştur
-          const headers = Object.keys(response.data[0]);
-          renderTableHeader(headers);
+          renderTableHeader(response.columns.map((col) => col.title));
 
-          // DataTable'ı başlat
+          // DataTable'ı server-side processing ile başlat
           dataTable = $("#report-table").DataTable({
-            data: response.data,
-            columns: headers.map((header) => ({ title: header, data: header })),
+            processing: true,
+            serverSide: true,
+            ajax: {
+              url:
+                M.cfg.wwwroot + "/local/mikacustomreport/get_report_data.php",
+              type: "POST",
+              contentType: "application/json",
+              data: function (d) {
+                // DataTables parametrelerini backend'e gönder
+                return JSON.stringify({
+                  draw: d.draw,
+                  start: d.start,
+                  length: d.length,
+                  search: d.search,
+                  order: d.order,
+                  columns: d.columns,
+                  user: selected.user,
+                  activity: selected.activity,
+                });
+              },
+              dataSrc: function (json) {
+                // Backend'den gelen veriyi DataTables formatına çevir
+                return json.data;
+              },
+            },
+            columns: response.columns,
             responsive: true,
             pageLength: 10,
             lengthMenu: [
-              [5, 10, 25, 50, 100, -1],
-              [5, 10, 25, 50, 100, "Tümü"],
+              [5, 10, 25, 50, 100],
+              [5, 10, 25, 50, 100],
             ],
             language: {
               url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/tr.json",
+              processing: "Veriler yükleniyor...",
+              loadingRecords: "Kayıtlar yükleniyor...",
             },
-            dom: "Blfrtip", // Buttons, length, filter, table, info, pagination
+            dom: "Blfrtip",
             buttons: ["copy", "csv", "excel", "pdf", "print"],
-            // Her sütun için arama kutusu ekle
+            // Sütun bazlı arama için footer ekle
             initComplete: function () {
               var api = this.api();
 
@@ -87,12 +113,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 var column = this;
                 var title = $(column.header()).text();
 
-                // Sütun başlığının altına arama kutusu ekle
                 var input = $(
                   '<input type="text" placeholder="' + title + ' ara" />'
                 )
                   .appendTo($(column.footer()).empty())
-                  .on("keyup change", function () {
+                  .on("keyup change clear", function () {
                     if (column.search() !== this.value) {
                       column.search(this.value).draw();
                     }
