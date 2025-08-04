@@ -57,7 +57,7 @@ try {
             'activitiescompleted' => 'COALESCE(cstats.completed_activities, 0) AS activitiescompleted',
             'totalactivities' => 'COALESCE(cstats.total_activities, 0) AS totalactivities',
             'completiontime' => 'SEC_TO_TIME(ccmp.timecompleted - ue.timecreated) AS completiontime',
-            'activitytimespent' => '(SELECT SEC_TO_TIME(COALESCE(logsure.total_time, 0)) FROM (SELECT t.userid, t.courseid, SUM(LEAST(t.diff, 1800)) AS total_time FROM (SELECT userid, courseid, LEAD(timecreated) OVER (PARTITION BY userid, courseid ORDER BY timecreated) - timecreated AS diff FROM cbd_logstore_standard_log WHERE action="viewed" AND target="course") AS t WHERE t.diff > 0 GROUP BY t.userid, t.courseid) AS logsure WHERE logsure.userid = u.id AND logsure.courseid = c.id) AS activitytimespent',
+            'activitytimespent' => 'SEC_TO_TIME(IFNULL(logsure.total_time, 0)) AS activitytimespent',
             'startdate' => 'c.startdate',
             'enddate' => 'c.enddate',
             'format' => 'c.format',
@@ -147,6 +147,26 @@ try {
             WHERE u2.deleted = 0
             GROUP BY u2.id, c2.id
         ) cstats ON cstats.userid = u.id AND cstats.courseid = c.id';
+        
+        // Optimized JOIN for activity time spent calculation
+        $joins .= ' LEFT JOIN (
+            SELECT 
+                oturum.userid,
+                oturum.courseid,
+                SUM(LEAST(oturum.diff, 1800)) AS total_time
+            FROM (
+                SELECT
+                    l.userid,
+                    l.courseid,
+                    l.timecreated,
+                    LEAD(l.timecreated) OVER (PARTITION BY l.userid, l.courseid ORDER BY l.timecreated) - l.timecreated AS diff
+                FROM cbd_logstore_standard_log l
+                WHERE l.courseid IS NOT NULL
+                  AND l.action = "viewed"
+            ) AS oturum
+            WHERE oturum.diff > 0
+            GROUP BY oturum.userid, oturum.courseid
+        ) logsure ON logsure.userid = u.id AND logsure.courseid = c.id';
     }
 
     // Arama filtresi ekle
