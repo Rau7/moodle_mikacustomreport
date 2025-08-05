@@ -21,6 +21,7 @@ const fieldLabels = {
     lastaccess: "Son Erişim",
     firstaccess: "İlk Erişim",
     timecreated: "Hesap Oluşturma Tarihi",
+    durum: "Durum (Aktif/Pasif)",
   },
   activity: {
     activityname: "Etkinlik Adı",

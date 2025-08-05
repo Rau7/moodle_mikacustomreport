@@ -48,7 +48,8 @@ try {
             'city' => 'u.city',
             'lastaccess' => 'u.lastaccess',
             'firstaccess' => 'u.firstaccess',
-            'timecreated' => 'u.timecreated'
+            'timecreated' => 'u.timecreated',
+            'durum' => 'CASE WHEN u.suspended = 0 THEN "Aktif" ELSE "Pasif" END AS durum'
         ],
         'activity' => [
             'activityname' => 'c.fullname AS activityname',

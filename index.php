@@ -61,6 +61,7 @@ echo $OUTPUT->header();
                         <option value="lastaccess">Son Erişim</option>
                         <option value="firstaccess">İlk Erişim</option>
                         <option value="timecreated">Hesap Oluşturma Tarihi</option>
+                        <option value="durum">Durum (Aktif/Pasif)</option>
                     </select>
                 </div>
             </div>
