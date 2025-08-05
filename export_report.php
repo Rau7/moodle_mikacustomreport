@@ -144,7 +144,7 @@ try {
     
     // Activity fields varsa JOIN ekle
     if ($hasActivityFields) {
-        $joins = ' JOIN cbd_user_enrolments ue ON ue.userid = u.id';
+        $joins .= ' JOIN cbd_user_enrolments ue ON ue.userid = u.id';
         $joins .= ' JOIN cbd_enrol e ON e.id = ue.enrolid';
         $joins .= ' JOIN cbd_course c ON c.id = e.courseid';
         $joins .= ' LEFT JOIN cbd_course_categories cc ON cc.id = c.category';
