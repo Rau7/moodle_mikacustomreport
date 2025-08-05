@@ -96,6 +96,75 @@ echo $OUTPUT->header();
                 <i class="fa fa-trash"></i> Tüm Alanları Temizle
             </button>
         </div>
+        
+        <!-- Date Range Filter for Activity Time Spent -->
+        <div id="date-range-container" class="date-range-container" style="display: none;">
+            <h4><i class="fa fa-calendar"></i> Eğitimde Geçirilen Süre - Tarih Aralığı</h4>
+            <div class="row">
+                <div class="col-md-6">
+                    <label for="start-year">Başlangıç Yılı:</label>
+                    <select id="start-year" class="form-control">
+                        <option value="2023">2023</option>
+                        <option value="2024">2024</option>
+                        <option value="2025" selected>2025</option>
+                        <option value="2026">2026</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="start-month">Başlangıç Ayı:</label>
+                    <select id="start-month" class="form-control">
+                        <option value="01">Ocak</option>
+                        <option value="02">Şubat</option>
+                        <option value="03">Mart</option>
+                        <option value="04">Nisan</option>
+                        <option value="05">Mayıs</option>
+                        <option value="06" selected>Haziran</option>
+                        <option value="07">Temmuz</option>
+                        <option value="08">Ağustos</option>
+                        <option value="09">Eylül</option>
+                        <option value="10">Ekim</option>
+                        <option value="11">Kasım</option>
+                        <option value="12">Aralık</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row" style="margin-top: 10px;">
+                <div class="col-md-6">
+                    <label for="end-year">Bitiş Yılı:</label>
+                    <select id="end-year" class="form-control">
+                        <option value="2023">2023</option>
+                        <option value="2024">2024</option>
+                        <option value="2025" selected>2025</option>
+                        <option value="2026">2026</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="end-month">Bitiş Ayı:</label>
+                    <select id="end-month" class="form-control">
+                        <option value="01">Ocak</option>
+                        <option value="02">Şubat</option>
+                        <option value="03">Mart</option>
+                        <option value="04">Nisan</option>
+                        <option value="05">Mayıs</option>
+                        <option value="06">Haziran</option>
+                        <option value="07" selected>Temmuz</option>
+                        <option value="08">Ağustos</option>
+                        <option value="09">Eylül</option>
+                        <option value="10">Ekim</option>
+                        <option value="11">Kasım</option>
+                        <option value="12">Aralık</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row" style="margin-top: 10px;">
+                <div class="col-md-12">
+                    <small class="text-muted">
+                        <i class="fa fa-info-circle"></i> 
+                        Bu tarih aralığı sadece "Etkinlikte Geçirilen Zaman" alanı için geçerlidir.
+                    </small>
+                </div>
+            </div>
+        </div>
     </div>
 
     <table id="report-table" class="display" style="width:100%">

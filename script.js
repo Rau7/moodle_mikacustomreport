@@ -1,5 +1,6 @@
 let dataTable = null;
 let selectedFields = { user: [], activity: [] };
+let rebuildTimeout = null; // For debouncing
 
 // Field labels mapping
 const fieldLabels = {
@@ -63,7 +64,7 @@ document.addEventListener("DOMContentLoaded", function () {
       .on("change", function () {
         selectedFields.user = $(this).val() || [];
         updateSelectedFieldsDisplay();
-        rebuildDataTable();
+        debouncedRebuildDataTable();
       });
 
     // Activity fields dropdown
@@ -76,13 +77,30 @@ document.addEventListener("DOMContentLoaded", function () {
       .on("change", function () {
         selectedFields.activity = $(this).val() || [];
         updateSelectedFieldsDisplay();
-        rebuildDataTable();
+        debouncedRebuildDataTable();
       });
 
     // Clear all fields button
     $("#clear-all-fields").on("click", function () {
       clearAllFields();
     });
+
+    // Date range change event listeners
+    $("#start-year, #start-month, #end-year, #end-month").on(
+      "change",
+      function () {
+        console.log("Date range changed, reloading DataTable...");
+
+        // Sadece activitytimespent seçiliyse ve DataTable varsa reload et
+        const hasActivityTimeSpent =
+          selectedFields.activity.includes("activitytimespent");
+
+        if (hasActivityTimeSpent && dataTable) {
+          console.log("Reloading DataTable with new date range");
+          dataTable.ajax.reload(null, false); // false = keep current page
+        }
+      }
+    );
   }
 
   // Update selected fields display
@@ -133,6 +151,21 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     displayContainer.innerHTML = html;
+
+    // Show/hide date range container based on activitytimespent selection
+    const dateRangeContainer = document.getElementById("date-range-container");
+    const hasActivityTimeSpent =
+      selectedFields.activity.includes("activitytimespent");
+
+    if (hasActivityTimeSpent) {
+      dateRangeContainer.style.display = "block";
+      console.log("Date range container shown - activitytimespent selected");
+    } else {
+      dateRangeContainer.style.display = "none";
+      console.log(
+        "Date range container hidden - activitytimespent not selected"
+      );
+    }
   }
 
   // Remove individual field
@@ -156,6 +189,48 @@ document.addEventListener("DOMContentLoaded", function () {
     $("#activity-fields-select").val(null).trigger("change");
   }
 
+  // Get selected fields
+  function getSelectedFields() {
+    return {
+      user: selectedFields.user,
+      activity: selectedFields.activity,
+    };
+  }
+
+  // Get date range parameters for activitytimespent
+  function getDateRangeParams() {
+    const hasActivityTimeSpent =
+      selectedFields.activity.includes("activitytimespent");
+
+    if (!hasActivityTimeSpent) {
+      return null; // No date range needed
+    }
+
+    const startYear = document.getElementById("start-year").value;
+    const startMonth = document.getElementById("start-month").value;
+    const endYear = document.getElementById("end-year").value;
+    const endMonth = document.getElementById("end-month").value;
+
+    // Calculate start and end dates (first day of start month to last day of end month)
+    const startDate = `${startYear}-${startMonth}-01`;
+    const endDate = new Date(parseInt(endYear), parseInt(endMonth), 0); // Last day of month
+    const endDateStr = `${endYear}-${endMonth.padStart(2, "0")}-${endDate
+      .getDate()
+      .toString()
+      .padStart(2, "0")}`;
+
+    console.log("Date range params:", { startDate, endDateStr });
+
+    return {
+      startDate: startDate,
+      endDate: endDateStr,
+      startYear: startYear,
+      startMonth: startMonth,
+      endYear: endYear,
+      endMonth: endMonth,
+    };
+  }
+
   function renderTableHeader(columns) {
     thead.innerHTML = "";
     columns.forEach((col) => {
@@ -163,6 +238,19 @@ document.addEventListener("DOMContentLoaded", function () {
       th.textContent = col;
       thead.appendChild(th);
     });
+  }
+
+  // Debounced version of rebuildDataTable to prevent rapid successive calls
+  function debouncedRebuildDataTable() {
+    // Clear existing timeout
+    if (rebuildTimeout) {
+      clearTimeout(rebuildTimeout);
+    }
+
+    // Set new timeout
+    rebuildTimeout = setTimeout(() => {
+      rebuildDataTable();
+    }, 300); // 300ms delay
   }
 
   function rebuildDataTable() {
@@ -219,6 +307,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
           // DataTable'ı server-side processing ile başlat
           try {
+            // Clear any existing table structure to prevent alignment issues
+            $("#report-table tbody").empty();
+
             dataTable = $("#report-table").DataTable({
               processing: true,
               serverSide: true,
@@ -228,6 +319,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 type: "POST",
                 contentType: "application/json",
                 data: function (d) {
+                  // Date range parametrelerini al
+                  const dateRange = getDateRangeParams();
+
                   // DataTables parametrelerini backend'e gönder
                   return JSON.stringify({
                     draw: d.draw,
@@ -238,6 +332,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     columns: d.columns,
                     user: selected.user,
                     activity: selected.activity,
+                    dateRange: dateRange,
                   });
                 },
                 dataSrc: function (json) {
@@ -246,17 +341,39 @@ document.addEventListener("DOMContentLoaded", function () {
                 },
               },
               columns: response.columns,
-              responsive: true,
-              scrollX: true,
-              scrollCollapse: true,
+              responsive: false,
+              scrollX: false,
+              scrollCollapse: false,
               autoWidth: false,
               columnDefs: [
                 {
                   targets: "_all",
                   className: "dt-nowrap",
-                  width: "auto",
+                  orderable: true,
                 },
               ],
+              initComplete: function () {
+                // Calculate equal column widths based on column count
+                const columnCount = this.api().columns().count();
+                const columnWidth = Math.floor(100 / columnCount);
+
+                // Apply equal widths to all columns
+                this.api()
+                  .columns()
+                  .every(function (index) {
+                    $(this.header()).css("width", columnWidth + "%");
+                    $(this.nodes()).css("width", columnWidth + "%");
+                  });
+
+                // Force column width recalculation after initialization
+                this.api().columns.adjust();
+                // Trigger a resize event to ensure proper alignment
+                $(window).trigger("resize");
+              },
+              drawCallback: function () {
+                // Adjust columns after each draw to prevent misalignment
+                this.api().columns.adjust();
+              },
               pageLength: 10,
               lengthMenu: [
                 [5, 10, 25, 50, 100],
@@ -366,11 +483,15 @@ document.addEventListener("DOMContentLoaded", function () {
       searchValue = dataTable.search();
     }
 
+    // Date range parametrelerini al
+    const dateRange = getDateRangeParams();
+
     const exportData = {
       user: selected.user,
       activity: selected.activity,
       format: format,
       search: searchValue,
+      dateRange: dateRange,
     };
 
     if (format === "copy") {

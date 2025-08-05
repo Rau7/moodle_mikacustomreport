@@ -21,6 +21,14 @@ try {
     // Hangi fieldlar seçilmiş kontrol et
     $hasUserFields = !empty($data['user']) && is_array($data['user']);
     $hasActivityFields = !empty($data['activity']) && is_array($data['activity']);
+    
+    // Date range parametrelerini al (activitytimespent için)
+    $dateRange = isset($data['dateRange']) ? $data['dateRange'] : null;
+    $hasDateRange = $dateRange !== null && !empty($dateRange['startDate']) && !empty($dateRange['endDate']);
+    
+    if ($hasDateRange) {
+        error_log("Date range detected: {$dateRange['startDate']} to {$dateRange['endDate']}");
+    }
 
     // Field mappings - SQL ifadeleri
     $fieldmaps = [
@@ -123,6 +131,12 @@ try {
     $joins = '';
     $where = 'u.deleted = 0'; // Silinmemiş kullanıcılar
     
+    // Performance optimization: Add early filtering for large datasets
+    if ($hasActivityFields && !empty($search)) {
+        // If searching, pre-filter users to reduce JOIN complexity
+        $where .= " AND (u.username LIKE '%$search%' OR u.firstname LIKE '%$search%' OR u.lastname LIKE '%$search%')";
+    }
+    
     // Activity fields varsa JOIN ekle
     if ($hasActivityFields) {
         $joins = ' JOIN cbd_user_enrolments ue ON ue.userid = u.id';
@@ -131,42 +145,44 @@ try {
         $joins .= ' LEFT JOIN cbd_course_categories cc ON cc.id = c.category';
         $joins .= ' LEFT JOIN cbd_course_completions ccmp ON ccmp.userid = u.id AND ccmp.course = c.id';
         
-        // Performance optimized JOIN for completion statistics
-        $joins .= ' LEFT JOIN (
-            SELECT 
-                u2.id as userid,
-                c2.id as courseid,
-                COUNT(CASE WHEN cmc.completionstate >= 1 THEN 1 END) as completed_activities,
-                COUNT(cm.id) as total_activities
-            FROM cbd_user u2
-            JOIN cbd_user_enrolments ue2 ON ue2.userid = u2.id
-            JOIN cbd_enrol e2 ON e2.id = ue2.enrolid
-            JOIN cbd_course c2 ON c2.id = e2.courseid
-            JOIN cbd_course_modules cm ON cm.course = c2.id AND cm.completion > 0
-            LEFT JOIN cbd_course_modules_completion cmc ON cmc.coursemoduleid = cm.id AND cmc.userid = u2.id
-            WHERE u2.deleted = 0
-            GROUP BY u2.id, c2.id
-        ) cstats ON cstats.userid = u.id AND cstats.courseid = c.id';
+        // Simplified completion statistics - only when needed
+        if (in_array('completedactivities', $data['activity']) || in_array('totalactivities', $data['activity']) || in_array('completionpercentage', $data['activity'])) {
+            $joins .= ' LEFT JOIN (
+                SELECT 
+                    ue2.userid,
+                    e2.courseid,
+                    COUNT(CASE WHEN cmc.completionstate >= 1 THEN 1 END) as completed_activities,
+                    COUNT(cm.id) as total_activities
+                FROM cbd_user_enrolments ue2
+                JOIN cbd_enrol e2 ON e2.id = ue2.enrolid
+                JOIN cbd_course_modules cm ON cm.course = e2.courseid AND cm.completion > 0
+                LEFT JOIN cbd_course_modules_completion cmc ON cmc.coursemoduleid = cm.id AND cmc.userid = ue2.userid
+                GROUP BY ue2.userid, e2.courseid
+            ) cstats ON cstats.userid = u.id AND cstats.courseid = c.id';
+        }
         
-        // Optimized JOIN for activity time spent calculation
-        $joins .= ' LEFT JOIN (
-            SELECT 
-                oturum.userid,
-                oturum.courseid,
-                SUM(LEAST(oturum.diff, 1800)) AS total_time
-            FROM (
-                SELECT
+        // Optimized JOIN for activity time spent calculation - only when needed
+        if (in_array('activitytimespent', $data['activity'])) {
+            $dateRangeCondition = '';
+            if ($hasDateRange) {
+                $startTimestamp = strtotime($dateRange['startDate']);
+                $endTimestamp = strtotime($dateRange['endDate'] . ' 23:59:59'); // End of day
+                $dateRangeCondition = " AND l.timecreated BETWEEN $startTimestamp AND $endTimestamp";
+                error_log("Date range condition: $dateRangeCondition");
+            }
+            
+            // Simplified time calculation without window functions
+            $joins .= ' LEFT JOIN (
+                SELECT 
                     l.userid,
                     l.courseid,
-                    l.timecreated,
-                    LEAD(l.timecreated) OVER (PARTITION BY l.userid, l.courseid ORDER BY l.timecreated) - l.timecreated AS diff
+                    COUNT(*) * 300 AS total_time
                 FROM cbd_logstore_standard_log l
                 WHERE l.courseid IS NOT NULL
-                  AND l.action = "viewed"
-            ) AS oturum
-            WHERE oturum.diff > 0
-            GROUP BY oturum.userid, oturum.courseid
-        ) logsure ON logsure.userid = u.id AND logsure.courseid = c.id';
+                  AND l.action = "viewed"' . $dateRangeCondition . '
+                GROUP BY l.userid, l.courseid
+            ) logsure ON logsure.userid = u.id AND logsure.courseid = c.id';
+        }
     }
 
     // Arama filtresi ekle

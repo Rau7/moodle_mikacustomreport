@@ -26,6 +26,14 @@ try {
     // Hangi fieldlar seçilmiş kontrol et
     $hasUserFields = !empty($data['user']) && is_array($data['user']);
     $hasActivityFields = !empty($data['activity']) && is_array($data['activity']);
+    
+    // Date range parametrelerini al (activitytimespent için)
+    $dateRange = isset($data['dateRange']) ? $data['dateRange'] : null;
+    $hasDateRange = $dateRange !== null && !empty($dateRange['startDate']) && !empty($dateRange['endDate']);
+    
+    if ($hasDateRange) {
+        error_log("Export date range detected: {$dateRange['startDate']} to {$dateRange['endDate']}");
+    }
 
     // Field mappings - SQL ifadeleri (get_report_data.php'den kopyalandı)
     $fieldmaps = [
@@ -131,6 +139,14 @@ try {
         ) cstats ON cstats.userid = u.id AND cstats.courseid = c.id';
         
         // Optimized JOIN for activity time spent calculation
+        $dateRangeCondition = '';
+        if ($hasDateRange) {
+            $startTimestamp = strtotime($dateRange['startDate']);
+            $endTimestamp = strtotime($dateRange['endDate'] . ' 23:59:59'); // End of day
+            $dateRangeCondition = " AND l.timecreated BETWEEN $startTimestamp AND $endTimestamp";
+            error_log("Export date range condition: $dateRangeCondition");
+        }
+        
         $joins .= ' LEFT JOIN (
             SELECT 
                 oturum.userid,
@@ -141,12 +157,15 @@ try {
                     l.userid,
                     l.courseid,
                     l.timecreated,
-                    LEAD(l.timecreated) OVER (PARTITION BY l.userid, l.courseid ORDER BY l.timecreated) - l.timecreated AS diff
+                    CASE
+                        WHEN LEAD(l.timecreated) OVER (PARTITION BY l.userid, l.courseid ORDER BY l.timecreated) IS NULL THEN 300
+                        ELSE LEAD(l.timecreated) OVER (PARTITION BY l.userid, l.courseid ORDER BY l.timecreated) - l.timecreated
+                    END AS diff
                 FROM cbd_logstore_standard_log l
                 WHERE l.courseid IS NOT NULL
-                  AND l.action = "viewed"
+                  AND l.action = "viewed"' . $dateRangeCondition . '
             ) AS oturum
-            WHERE oturum.diff > 0
+            WHERE oturum.diff > 0 AND oturum.diff <= 1800
             GROUP BY oturum.userid, oturum.courseid
         ) logsure ON logsure.userid = u.id AND logsure.courseid = c.id';
     }

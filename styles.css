@@ -283,6 +283,83 @@
   padding-left: 15px !important;
 }
 
+/* Date Range Container */
+.date-range-container {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.date-range-container h4 {
+  color: #495057;
+  margin-bottom: 15px;
+  font-size: 16px;
+}
+
+.date-range-container .form-control {
+  border-radius: 4px;
+  border: 1px solid #ced4da;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.date-range-container .form-control:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.date-range-container label {
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 5px;
+  display: block;
+}
+
+.date-range-container .text-muted {
+  font-size: 13px;
+  color: #6c757d !important;
+}
+
 .select2-selection__choice__remove {
   margin-top: 3px !important;
+}
+
+/* Force thead and tbody alignment */
+.dataTable {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+.dataTable thead th,
+.dataTable tbody td {
+  box-sizing: border-box;
+  padding: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Prevent DataTable from creating separate header table */
+.dataTables_scrollHead {
+  overflow: visible !important;
+}
+
+.dataTables_scrollHeadInner {
+  width: 100% !important;
+}
+
+.dataTables_scrollHeadInner table {
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+/* Force equal column widths - will be overridden by JavaScript */
+.dataTable thead th,
+.dataTable tbody td {
+  width: auto;
+  min-width: 100px;
+  max-width: 300px;
 }
