@@ -37,7 +37,7 @@ try {
             'email' => 'u.email',
             'firstname' => 'u.firstname',
             'lastname' => 'u.lastname',
-            'timespent' => 'SEC_TO_TIME(u.lastaccess - u.firstaccess) AS timespent',
+            'timespent' => 'IFNULL(user_time.toplam_sure, "00:00:00") AS timespent',
             'start' => "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = 'start') AS start",
             'bolum' => "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = 'bolum') AS bolum",
             'end' => "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = 'end') AS end",
@@ -141,6 +141,24 @@ try {
     $from = 'cbd_user u';
     $joins = '';
     $where = 'u.deleted = 0'; // Silinmemiş kullanıcılar
+    
+    // Add user_time JOIN if timespent field is selected
+    if ($hasUserFields && in_array('timespent', $data['user'])) {
+        $joins .= ' LEFT JOIN (
+            SELECT 
+                zamanlar.userid,
+                SEC_TO_TIME(SUM(LEAST(zaman_araligi, 1800))) AS toplam_sure
+            FROM (
+                SELECT 
+                    l.userid,
+                    LEAD(l.timecreated) OVER (PARTITION BY l.userid ORDER BY l.timecreated) - l.timecreated AS zaman_araligi
+                FROM cbd_logstore_standard_log l
+                WHERE l.userid IS NOT NULL
+            ) AS zamanlar
+            WHERE zaman_araligi IS NOT NULL AND zaman_araligi > 0
+            GROUP BY zamanlar.userid
+        ) user_time ON user_time.userid = u.id';
+    }
     
     // Performance optimization: Add early filtering for large datasets
     if ($hasActivityFields && !empty($search)) {
