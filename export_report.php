@@ -76,7 +76,17 @@ try {
             'enddate' => 'c.enddate',
             'format' => 'c.format',
             'completionenabled' => 'c.enablecompletion',
-            'guestaccess' => '(SELECT COUNT(*) FROM cbd_enrol e2 WHERE e2.courseid = c.id AND e2.enrol = "guest") AS guestaccess'
+            'guestaccess' => '(SELECT COUNT(*) FROM cbd_enrol e2 WHERE e2.courseid = c.id AND e2.enrol = "guest") AS guestaccess',
+            'kayityontemi' => 'CASE 
+                WHEN e.enrol = "manual" THEN "El ile kayıt"
+                WHEN e.enrol = "self" THEN "Kendi kendine kayıt"
+                WHEN e.enrol = "autoenrol" THEN "Otomatik kayıt"
+                WHEN e.enrol = "guest" THEN "Misafir erişim"
+                WHEN e.enrol = "cohort" THEN "Grup kayıt"
+                WHEN e.enrol = "database" THEN "Veritabanı kayıt"
+                WHEN e.enrol = "ldap" THEN "LDAP kayıt"
+                ELSE CONCAT("Diğer (", e.enrol, ")")
+            END AS kayityontemi'
         ]
     ];
 

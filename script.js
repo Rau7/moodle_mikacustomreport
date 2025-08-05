@@ -38,6 +38,7 @@ const fieldLabels = {
     format: "Format",
     completionenabled: "Tamamlama Etkin",
     guestaccess: "Misafir Erişimi",
+    kayityontemi: "Kayıt Yöntemi",
   },
 };
 
