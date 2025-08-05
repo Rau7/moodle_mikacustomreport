@@ -175,18 +175,17 @@ try {
         $joins .= ' LEFT JOIN cbd_course_completions ccmp ON ccmp.userid = u.id AND ccmp.course = c.id';
         
         // Simplified completion statistics - only when needed
-        if (in_array('completedactivities', $data['activity']) || in_array('totalactivities', $data['activity']) || in_array('completionpercentage', $data['activity'])) {
+        if (in_array('progress', $data['activity']) || in_array('completedactivities', $data['activity']) || in_array('totalactivities', $data['activity']) || in_array('completionpercentage', $data['activity'])) {
             $joins .= ' LEFT JOIN (
                 SELECT 
-                    ue2.userid,
-                    e2.courseid,
+                    cm.course as courseid,
+                    cmc.userid,
                     COUNT(CASE WHEN cmc.completionstate >= 1 THEN 1 END) as completed_activities,
                     COUNT(cm.id) as total_activities
-                FROM cbd_user_enrolments ue2
-                JOIN cbd_enrol e2 ON e2.id = ue2.enrolid
-                JOIN cbd_course_modules cm ON cm.course = e2.courseid AND cm.completion > 0
-                LEFT JOIN cbd_course_modules_completion cmc ON cmc.coursemoduleid = cm.id AND cmc.userid = ue2.userid
-                GROUP BY ue2.userid, e2.courseid
+                FROM cbd_course_modules cm
+                LEFT JOIN cbd_course_modules_completion cmc ON cmc.coursemoduleid = cm.id
+                WHERE cm.completion > 0 AND cm.deletioninprogress = 0
+                GROUP BY cm.course, cmc.userid
             ) cstats ON cstats.userid = u.id AND cstats.courseid = c.id';
         }
         
