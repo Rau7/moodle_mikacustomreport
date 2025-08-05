@@ -175,7 +175,7 @@ try {
         $joins .= ' LEFT JOIN cbd_course_completions ccmp ON ccmp.userid = u.id AND ccmp.course = c.id';
         
         // Simplified completion statistics - only when needed
-        if (in_array('progress', $data['activity']) || in_array('completedactivities', $data['activity']) || in_array('totalactivities', $data['activity']) || in_array('completionpercentage', $data['activity'])) {
+        if (in_array('progress', $data['activity']) || in_array('activitiescompleted', $data['activity']) || in_array('totalactivities', $data['activity']) || in_array('completionpercentage', $data['activity'])) {
             $joins .= ' LEFT JOIN (
                 SELECT 
                     cm.course as courseid,
