@@ -30,6 +30,43 @@ try {
         error_log("Date range detected: {$dateRange['startDate']} to {$dateRange['endDate']}");
     }
 
+    // Turkish field labels for column headers
+    $fieldLabels = [
+        'user' => [
+            'username' => 'Kullanıcı Adı',
+            'email' => 'E-posta',
+            'firstname' => 'Ad',
+            'lastname' => 'Soyad',
+            'timespent' => 'Sitede Geçirilen Zaman',
+            'start' => 'Başlangıç Tarihi (Özel)',
+            'bolum' => 'Bölüm (Özel)',
+            'end' => 'Bitiş Tarihi (Özel)',
+            'departman' => 'Departman',
+            'position' => 'Pozisyon (Özel)',
+            'unvan' => 'Unvan',
+            'adres' => 'Adres',
+            'birim' => 'Birim',
+            'sicil' => 'Sicil',
+            'tc' => 'TC',
+            'ceptelefonu' => 'Cep Telefonu',
+            'sitesongiris' => 'Site Son Giriş Tarihi',
+            'siteilkgiris' => 'Site İlk Giriş Tarihi',
+            'sitekayittarihi' => 'Site Kayıt Tarihi',
+            'durum' => 'Durum (Aktif/Pasif)'
+        ],
+        'activity' => [
+            'activityname' => 'Etkinlik Adı',
+            'category' => 'Kategori',
+            'registrationdate' => 'Kayıt Tarihi',
+            'progress' => 'İlerleme (%)',
+            'completionstatus' => 'Tamamlanma Durumu',
+            'activitiescompleted' => 'Tamamlanan Aktiviteler',
+            'totalactivities' => 'Toplam Aktiviteler',
+            'activitytimespent' => 'Eğitimde Geçirilen Süre',
+            'kayityontemi' => 'Kayıt Yöntemi'
+        ]
+    ];
+
     // Field mappings - SQL ifadeleri
     $fieldmaps = [
         'user' => [
@@ -119,14 +156,16 @@ try {
         if ($hasUserFields) {
             foreach ($data['user'] as $field) {
                 if (isset($fieldmaps['user'][$field])) {
-                    $columns[] = ['data' => $field, 'title' => ucfirst(str_replace('_', ' ', $field))];
+                    $title = isset($fieldLabels['user'][$field]) ? $fieldLabels['user'][$field] : ucfirst(str_replace('_', ' ', $field));
+                    $columns[] = ['data' => $field, 'title' => $title];
                 }
             }
         }
         if ($hasActivityFields) {
             foreach ($data['activity'] as $field) {
                 if (isset($fieldmaps['activity'][$field])) {
-                    $columns[] = ['data' => $field, 'title' => ucfirst(str_replace('_', ' ', $field))];
+                    $title = isset($fieldLabels['activity'][$field]) ? $fieldLabels['activity'][$field] : ucfirst(str_replace('_', ' ', $field));
+                    $columns[] = ['data' => $field, 'title' => $title];
                 }
             }
         }
