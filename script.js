@@ -379,6 +379,29 @@ document.addEventListener("DOMContentLoaded", function () {
                   className: "dt-nowrap",
                   orderable: true,
                 },
+                {
+                  // Special handling for timespent column - convert time to seconds for sorting
+                  targets: function (index, data, node) {
+                    return $(node).text() === "timespent";
+                  },
+                  type: "num",
+                  render: function (data, type, row, meta) {
+                    if (type === "sort" || type === "type") {
+                      // Convert HHH:MM:SS to seconds for proper numeric sorting
+                      if (!data || data === "00:00:00" || data === "000:00:00")
+                        return 0;
+                      const parts = data.split(":");
+                      if (parts.length !== 3) return 0;
+
+                      const hours = parseInt(parts[0]) || 0;
+                      const minutes = parseInt(parts[1]) || 0;
+                      const seconds = parseInt(parts[2]) || 0;
+
+                      return hours * 3600 + minutes * 60 + seconds;
+                    }
+                    return data; // For display, use the formatted time string
+                  },
+                },
               ],
               initComplete: function () {
                 // Calculate equal column widths based on column count

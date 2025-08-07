@@ -43,6 +43,7 @@ try {
             'firstname' => 'u.firstname',
             'lastname' => 'u.lastname',
             'timespent' => 'IFNULL(user_time.toplam_sure, "00:00:00") AS timespent',
+            'timespent_seconds' => 'IFNULL(TIME_TO_SEC(user_time.toplam_sure), 0) AS timespent_seconds',
             'start' => "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = 'start') AS start",
             'bolum' => "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = 'bolum') AS bolum",
             'end' => "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = 'end') AS end",
@@ -130,18 +131,18 @@ try {
     // Add user_time JOIN if timespent field is selected
     if ($hasUserFields && in_array('timespent', $data['user'])) {
         $joins .= ' LEFT JOIN (
-            SELECT 
-                zamanlar.userid,
-                SEC_TO_TIME(SUM(LEAST(zaman_araligi, 1800))) AS toplam_sure
+            SELECT
+                logs.userid,
+                SEC_TO_TIME(SUM(session_duration)) AS toplam_sure
             FROM (
-                SELECT 
-                    l.userid,
-                    LEAD(l.timecreated) OVER (PARTITION BY l.userid ORDER BY l.timecreated) - l.timecreated AS zaman_araligi
-                FROM cbd_logstore_standard_log l
-                WHERE l.userid IS NOT NULL
-            ) AS zamanlar
-            WHERE zaman_araligi IS NOT NULL AND zaman_araligi > 0
-            GROUP BY zamanlar.userid
+                SELECT
+                    userid,
+                    timecreated,
+                    LEAD(timecreated) OVER (PARTITION BY userid ORDER BY timecreated) - timecreated AS session_duration
+                FROM cbd_logstore_standard_log
+            ) AS logs
+            WHERE session_duration > 0 AND session_duration <= 1800
+            GROUP BY logs.userid
         ) user_time ON user_time.userid = u.id';
     }
     
