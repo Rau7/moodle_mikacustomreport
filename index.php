@@ -178,6 +178,15 @@ echo $OUTPUT->header();
         </thead>
         <tbody></tbody>
     </table>
+    
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Veriler yükleniyor...</div>
+            <div class="loading-subtext">Lütfen bekleyin, rapor hazırlanıyor.</div>
+        </div>
+    </div>
 </div>
 
 <?php

@@ -1,6 +1,30 @@
-let dataTable = null;
+let dataTable;
 let selectedFields = { user: [], activity: [] };
-let rebuildTimeout = null; // For debouncing
+let currentRequest = null;
+let debounceTimer = null;
+let isLoading = false;
+
+// Loading state management
+function showLoading() {
+  if (isLoading) return; // Prevent multiple loading screens
+  isLoading = true;
+  document.getElementById("loading-overlay").style.display = "flex";
+  document.body.classList.add("loading-active");
+}
+
+function hideLoading() {
+  isLoading = false;
+  document.getElementById("loading-overlay").style.display = "none";
+  document.body.classList.remove("loading-active");
+}
+
+// Debounce function to prevent rapid AJAX calls
+function debounce(func, delay) {
+  return function (...args) {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => func.apply(this, args), delay);
+  };
+}
 
 // Field labels mapping
 const fieldLabels = {
@@ -84,6 +108,9 @@ document.addEventListener("DOMContentLoaded", function () {
         updateSelectedFieldsDisplay();
         debouncedRebuildDataTable();
       });
+
+    // Create debounced version of rebuildDataTable
+    const debouncedRebuildDataTable = debounce(rebuildDataTable, 800);
 
     // Clear all fields button
     $("#clear-all-fields").on("click", function () {
@@ -245,20 +272,16 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // Debounced version of rebuildDataTable to prevent rapid successive calls
-  function debouncedRebuildDataTable() {
-    // Clear existing timeout
-    if (rebuildTimeout) {
-      clearTimeout(rebuildTimeout);
+  function rebuildDataTable() {
+    // Cancel any existing request
+    if (currentRequest) {
+      currentRequest.abort();
+      currentRequest = null;
     }
 
-    // Set new timeout
-    rebuildTimeout = setTimeout(() => {
-      rebuildDataTable();
-    }, 300); // 300ms delay
-  }
+    // Show loading screen
+    showLoading();
 
-  function rebuildDataTable() {
     const selected = getSelectedFields();
     const allFields = [...selected.user, ...selected.activity];
 
@@ -291,7 +314,7 @@ document.addEventListener("DOMContentLoaded", function () {
     $("#report-table").show();
 
     // İlk olarak sütun başlıklarını almak için küçük bir örnek veri çekelim
-    $.ajax({
+    currentRequest = $.ajax({
       url: M.cfg.wwwroot + "/local/mikacustomreport/get_report_data.php",
       type: "POST",
       contentType: "application/json",
@@ -374,10 +397,16 @@ document.addEventListener("DOMContentLoaded", function () {
                 this.api().columns.adjust();
                 // Trigger a resize event to ensure proper alignment
                 $(window).trigger("resize");
+
+                // Hide loading screen after table is initialized
+                hideLoading();
               },
               drawCallback: function () {
                 // Adjust columns after each draw to prevent misalignment
                 this.api().columns.adjust();
+
+                // Hide loading screen after each draw
+                hideLoading();
               },
               pageLength: 10,
               lengthMenu: [
@@ -463,6 +492,9 @@ document.addEventListener("DOMContentLoaded", function () {
       error: function (xhr, error, thrown) {
         console.error("AJAX Error:", error, thrown);
         console.log(xhr.responseText);
+
+        // Hide loading screen on error
+        hideLoading();
 
         renderTableHeader(["Hata"]);
         tbody.innerHTML = `<tr><td>Veri alınırken bir hata oluştu: ${error}</td></tr>`;
