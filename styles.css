@@ -347,21 +347,26 @@
   overflow: visible !important;
 }
 
-.dataTables_scrollHeadInner {
-  width: 100% !important;
+/* DataTable wrapper horizontal scroll for wide tables */
+.dataTables_wrapper {
+  overflow-x: auto;
+  width: 100%;
 }
 
-.dataTables_scrollHeadInner table {
-  width: 100% !important;
-  table-layout: fixed !important;
+/* Single table styling */
+#report-table {
+  width: auto !important;
+  min-width: 100%;
 }
 
-/* Force equal column widths - will be overridden by JavaScript */
-.dataTable thead th,
-.dataTable tbody td {
-  width: auto;
-  min-width: 100px;
-  max-width: 300px;
+/* Column styling */
+#report-table thead th,
+#report-table tbody td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 8px 12px;
+  min-width: 150px; /* Minimum readable width */
 }
 
 /* Loading Screen Styles */
