@@ -41,14 +41,17 @@ try {
             'start' => "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = 'start') AS start",
             'bolum' => "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = 'bolum') AS bolum",
             'end' => "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = 'end') AS end",
-            'department' => 'u.department',
+            'departman' => 'u.department AS departman',
             'position' => "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = 'position') AS position",
-            'institution' => 'u.institution',
-            'address' => 'u.address',
-            'city' => 'u.city',
-            'lastaccess' => 'u.lastaccess',
-            'firstaccess' => 'u.firstaccess',
-            'timecreated' => 'u.timecreated',
+            'unvan' => 'u.institution AS unvan',
+            'adres' => 'u.address AS adres',
+            'birim' => 'u.city AS birim',
+            'sicil' => 'u.phone1 AS sicil',
+            'tc' => 'u.idnumber AS tc',
+            'ceptelefonu' => 'u.phone2 AS ceptelefonu',
+            'sitesongiris' => 'u.lastaccess AS sitesongiris',
+            'siteilkgiris' => 'u.firstaccess AS siteilkgiris',
+            'sitekayittarihi' => 'u.timecreated AS sitekayittarihi',
             'durum' => 'CASE WHEN u.suspended = 0 THEN "Aktif" ELSE "Pasif" END AS durum'
         ],
         'activity' => [
@@ -305,10 +308,16 @@ try {
         }
     }
 
+    // Add filter for activitytimespent if selected (exclude users with 0 time)
+    $activityTimeFilter = '';
+    if ($hasActivityFields && in_array('activitytimespent', $data['activity'])) {
+        $activityTimeFilter = ' AND logsure.total_time > 0';
+    }
+    
     // Final SQL
     $selectClause = implode(', ', $selects);
-    $countSql = "SELECT COUNT(*) as total FROM $from$joins WHERE $where$searchWhere";
-    $dataSql = "SELECT $selectClause FROM $from$joins WHERE $where$searchWhere$orderBy";
+    $countSql = "SELECT COUNT(*) as total FROM $from$joins WHERE $where$searchWhere$activityTimeFilter";
+    $dataSql = "SELECT $selectClause FROM $from$joins WHERE $where$searchWhere$activityTimeFilter$orderBy";
     
     // LIMIT ve OFFSET ekle (length: -1 ise tüm veriyi döndür)
     if ($length > 0) {

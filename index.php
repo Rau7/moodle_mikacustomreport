@@ -53,14 +53,17 @@ echo $OUTPUT->header();
                         <option value="start">Başlangıç Tarihi (Özel)</option>
                         <option value="bolum">Bölüm (Özel)</option>
                         <option value="end">Bitiş Tarihi (Özel)</option>
-                        <option value="department">Departman</option>
+                        <option value="departman">Departman</option>
                         <option value="position">Pozisyon (Özel)</option>
-                        <option value="institution">Kurum</option>
-                        <option value="address">Adres</option>
-                        <option value="city">Şehir</option>
-                        <option value="lastaccess">Son Erişim</option>
-                        <option value="firstaccess">İlk Erişim</option>
-                        <option value="timecreated">Hesap Oluşturma Tarihi</option>
+                        <option value="unvan">Unvan</option>
+                        <option value="adres">Adres</option>
+                        <option value="birim">Birim</option>
+                        <option value="sicil">Sicil</option>
+                        <option value="tc">TC</option>
+                        <option value="ceptelefonu">Cep Telefonu</option>
+                        <option value="sitesongiris">Site Son Giriş Tarihi</option>
+                        <option value="siteilkgiris">Site İlk Giriş Tarihi</option>
+                        <option value="sitekayittarihi">Site Kayıt Tarihi</option>
                         <option value="durum">Durum (Aktif/Pasif)</option>
                     </select>
                 </div>
