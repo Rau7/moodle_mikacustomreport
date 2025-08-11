@@ -184,8 +184,8 @@ try {
                 SELECT 
                     l.userid,
                     l.courseid,
-                    -- Her benzersiz gün için 15 dakika (günlük ortalama oturum)
-                    COUNT(DISTINCT DATE(FROM_UNIXTIME(l.timecreated))) * 900 + 
+                    -- Her benzersiz gün için 30 dakika (günlük ortalama oturum)
+                    COUNT(DISTINCT DATE(FROM_UNIXTIME(l.timecreated))) * 1800 + 
                     -- Aynı gün içinde ekstra aktiviteler için 5 dakika
                     GREATEST(0, (COUNT(*) - COUNT(DISTINCT DATE(FROM_UNIXTIME(l.timecreated))))) * 300 AS total_time
                 FROM cbd_logstore_standard_log l
