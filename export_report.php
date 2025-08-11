@@ -179,14 +179,18 @@ try {
                 error_log("Export date range condition: $dateRangeCondition");
             }
             
-            // Simplified time calculation without window functions
+            // Improved session-based time estimation (performant but more accurate)
             $joins .= ' LEFT JOIN (
                 SELECT 
                     l.userid,
                     l.courseid,
-                    COUNT(*) * 300 AS total_time
+                    -- Her benzersiz gün için 15 dakika (günlük ortalama oturum)
+                    COUNT(DISTINCT DATE(FROM_UNIXTIME(l.timecreated))) * 900 + 
+                    -- Aynı gün içinde ekstra aktiviteler için 5 dakika
+                    GREATEST(0, (COUNT(*) - COUNT(DISTINCT DATE(FROM_UNIXTIME(l.timecreated))))) * 300 AS total_time
                 FROM cbd_logstore_standard_log l
                 WHERE l.courseid IS NOT NULL
+                  AND l.target = "course"
                   AND l.action = "viewed"' . $dateRangeCondition . '
                 GROUP BY l.userid, l.courseid
             ) logsure ON logsure.userid = u.id AND logsure.courseid = c.id';
