@@ -99,10 +99,11 @@ try {
             'shortname' => 'c.shortname',
             'category' => 'cc.name AS category',
             'registrationdate' => 'ue.timecreated AS registrationdate',
-            'progress' => 'CASE 
-                WHEN COALESCE(cstats.total_activities, 0) = 0 THEN 0
-                ELSE ROUND(COALESCE(cstats.completed_activities, 0) * 100.0 / cstats.total_activities, 1)
-            END AS progress',
+            'progress' => 'ROUND(
+                100 * 
+                COALESCE(cstats.completed_activities, 0) 
+                / NULLIF(COALESCE(cstats.total_activities, 0), 0)
+            , 2) AS progress',
             'completionstatus' => 'CASE WHEN ccmp.timecompleted IS NOT NULL THEN "Completed" ELSE "Not Completed" END AS completionstatus',
             'activitiescompleted' => 'COALESCE(cstats.completed_activities, 0) AS activitiescompleted',
             'totalactivities' => 'COALESCE(cstats.total_activities, 0) AS totalactivities',
@@ -217,17 +218,17 @@ try {
         $joins .= ' LEFT JOIN cbd_course_categories cc ON cc.id = c.category';
         $joins .= ' LEFT JOIN cbd_course_completions ccmp ON ccmp.userid = u.id AND ccmp.course = c.id';
         
-        // Simplified completion statistics - only when needed
+        // User-provided completion statistics calculation (exact formula)
         if (in_array('progress', $data['activity']) || in_array('activitiescompleted', $data['activity']) || in_array('totalactivities', $data['activity']) || in_array('completionpercentage', $data['activity'])) {
             $joins .= ' LEFT JOIN (
                 SELECT 
                     cm.course as courseid,
                     cmc.userid,
-                    COUNT(CASE WHEN cmc.completionstate >= 1 THEN 1 END) as completed_activities,
-                    COUNT(cm.id) as total_activities
+                    SUM(CASE WHEN cmc.completionstate > 0 THEN 1 ELSE 0 END) as completed_activities,
+                    SUM(CASE WHEN cm.completion > 0 THEN 1 ELSE 0 END) as total_activities
                 FROM cbd_course_modules cm
-                LEFT JOIN cbd_course_modules_completion cmc ON cmc.coursemoduleid = cm.id
-                WHERE cm.completion > 0 AND cm.deletioninprogress = 0
+                LEFT JOIN cbd_course_modules_completion cmc ON cmc.coursemoduleid = cm.id AND cmc.userid IS NOT NULL
+                WHERE cm.deletioninprogress = 0
                 GROUP BY cm.course, cmc.userid
             ) cstats ON cstats.userid = u.id AND cstats.courseid = c.id';
         }
@@ -357,11 +358,8 @@ try {
         }
     }
 
-    // Add filter for activitytimespent if selected (exclude users with 0 time)
+    // No filter for activitytimespent - show all records including 0 values
     $activityTimeFilter = '';
-    if ($hasActivityFields && in_array('activitytimespent', $data['activity'])) {
-        $activityTimeFilter = ' AND logsure.total_time > 0';
-    }
     
     // Final SQL
     $selectClause = implode(', ', $selects);

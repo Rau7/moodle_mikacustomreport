@@ -154,17 +154,17 @@ try {
         $joins .= ' LEFT JOIN cbd_course_categories cc ON cc.id = c.category';
         $joins .= ' LEFT JOIN cbd_course_completions ccmp ON ccmp.userid = u.id AND ccmp.course = c.id';
         
-        // Simplified completion statistics - only when needed
+        // User-provided completion statistics calculation (exact formula)
         if (in_array('progress', $data['activity']) || in_array('activitiescompleted', $data['activity']) || in_array('totalactivities', $data['activity'])) {
             $joins .= ' LEFT JOIN (
                 SELECT 
                     cm.course as courseid,
                     cmc.userid,
-                    COUNT(CASE WHEN cmc.completionstate >= 1 THEN 1 END) as completed_activities,
-                    COUNT(cm.id) as total_activities
+                    SUM(CASE WHEN cmc.completionstate > 0 THEN 1 ELSE 0 END) as completed_activities,
+                    SUM(CASE WHEN cm.completion > 0 THEN 1 ELSE 0 END) as total_activities
                 FROM cbd_course_modules cm
-                LEFT JOIN cbd_course_modules_completion cmc ON cmc.coursemoduleid = cm.id
-                WHERE cm.completion > 0 AND cm.deletioninprogress = 0
+                LEFT JOIN cbd_course_modules_completion cmc ON cmc.coursemoduleid = cm.id AND cmc.userid IS NOT NULL
+                WHERE cm.deletioninprogress = 0
                 GROUP BY cm.course, cmc.userid
             ) cstats ON cstats.userid = u.id AND cstats.courseid = c.id';
         }
@@ -236,11 +236,8 @@ try {
         }
     }
 
-    // Add filter for activitytimespent if selected (exclude users with 0 time)
+    // No filter for activitytimespent - show all records including 0 values
     $activityTimeFilter = '';
-    if ($hasActivityFields && in_array('activitytimespent', $data['activity'])) {
-        $activityTimeFilter = ' AND logsure.total_time > 0';
-    }
     
     // Final SQL - TÜM VERİYİ ÇEK (LIMIT YOK!)
     $selectClause = implode(', ', $selects);
