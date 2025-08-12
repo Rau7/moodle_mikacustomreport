@@ -71,7 +71,7 @@ try {
                 WHEN COALESCE(cstats.total_activities, 0) = 0 THEN 0
                 ELSE ROUND(COALESCE(cstats.completed_activities, 0) * 100.0 / cstats.total_activities, 1)
             END AS progress',
-            'completionstatus' => 'CASE WHEN ccmp.timecompleted IS NOT NULL THEN "Completed" ELSE "Not Completed" END AS completionstatus',
+            'completionstatus' => 'CASE WHEN ccmp.timecompleted IS NOT NULL THEN "Tamamlandı" ELSE "Tamamlanmadı" END AS completionstatus',
             'activitiescompleted' => 'COALESCE(cstats.completed_activities, 0) AS activitiescompleted',
             'totalactivities' => 'COALESCE(cstats.total_activities, 0) AS totalactivities',
             'completiontime' => 'SEC_TO_TIME(ccmp.timecompleted - ue.timecreated) AS completiontime',
@@ -94,6 +94,50 @@ try {
         ]
     ];
 
+    // Turkish header mappings for export
+    $turkishHeaders = [
+        // User fields
+        'username' => 'Kullanıcı Adı',
+        'email' => 'E-posta',
+        'firstname' => 'Ad',
+        'lastname' => 'Soyad',
+        'timespent' => 'Sitede Geçirilen Zaman',
+        'start' => 'Başlangıç',
+        'bolum' => 'Bölüm',
+        'end' => 'Bitiş',
+        'departman' => 'Departman',
+        'position' => 'Pozisyon',
+        'unvan' => 'Ünvan',
+        'adres' => 'Adres',
+        'birim' => 'Birim',
+        'sicil' => 'Sicil',
+        'tc' => 'TC',
+        'ceptelefonu' => 'Cep Telefonu',
+        'sitesongiris' => 'Site Son Giriş',
+        'siteilkgiris' => 'Site İlk Giriş',
+        'sitekayittarihi' => 'Site Kayıt Tarihi',
+        'durum' => 'Durum',
+        // Activity fields
+        'activityname' => 'Eğitim Adı',
+        'name' => 'Eğitim Adı',
+        'fullname' => 'Eğitim Tam Adı',
+        'shortname' => 'Eğitim Kısa Adı',
+        'category' => 'Kategori',
+        'registrationdate' => 'Kayıt Tarihi',
+        'progress' => 'İlerleme %',
+        'completionstatus' => 'Tamamlanma Durumu',
+        'activitiescompleted' => 'Tamamlanan Aktiviteler',
+        'totalactivities' => 'Toplam Aktiviteler',
+        'completiontime' => 'Tamamlanma Süresi',
+        'activitytimespent' => 'Eğitimde Geçirilen Süre',
+        'startdate' => 'Başlangıç Tarihi',
+        'enddate' => 'Bitiş Tarihi',
+        'format' => 'Format',
+        'completionenabled' => 'Tamamlanma Etkin',
+        'guestaccess' => 'Misafir Erişim',
+        'kayityontemi' => 'Kayıt Yöntemi'
+    ];
+    
     // SELECT fieldları oluştur
     $selects = [];
     $headers = [];
@@ -102,7 +146,7 @@ try {
         foreach ($data['user'] as $field) {
             if (isset($fieldmaps['user'][$field])) {
                 $selects[] = $fieldmaps['user'][$field];
-                $headers[] = ucfirst(str_replace('_', ' ', $field));
+                $headers[] = isset($turkishHeaders[$field]) ? $turkishHeaders[$field] : ucfirst(str_replace('_', ' ', $field));
             }
         }
     }
@@ -111,7 +155,7 @@ try {
         foreach ($data['activity'] as $field) {
             if (isset($fieldmaps['activity'][$field])) {
                 $selects[] = $fieldmaps['activity'][$field];
-                $headers[] = ucfirst(str_replace('_', ' ', $field));
+                $headers[] = isset($turkishHeaders[$field]) ? $turkishHeaders[$field] : ucfirst(str_replace('_', ' ', $field));
             }
         }
     }

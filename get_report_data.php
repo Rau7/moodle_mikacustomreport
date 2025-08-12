@@ -104,7 +104,7 @@ try {
                 COALESCE(cstats.completed_activities, 0) 
                 / NULLIF(COALESCE(cstats.total_activities, 0), 0)
             , 2) AS progress',
-            'completionstatus' => 'CASE WHEN ccmp.timecompleted IS NOT NULL THEN "Completed" ELSE "Not Completed" END AS completionstatus',
+            'completionstatus' => 'CASE WHEN ccmp.timecompleted IS NOT NULL THEN "Tamamlandı" ELSE "Tamamlanmadı" END AS completionstatus',
             'activitiescompleted' => 'COALESCE(cstats.completed_activities, 0) AS activitiescompleted',
             'totalactivities' => 'COALESCE(cstats.total_activities, 0) AS totalactivities',
             'completiontime' => 'SEC_TO_TIME(ccmp.timecompleted - ue.timecreated) AS completiontime',
