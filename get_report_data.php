@@ -204,11 +204,7 @@ try {
         ) user_time ON user_time.userid = u.id';
     }
     
-    // Performance optimization: Add early filtering for large datasets
-    if ($hasActivityFields && !empty($search)) {
-        // If searching, pre-filter users to reduce JOIN complexity
-        $where .= " AND (u.username LIKE '%$search%' OR u.firstname LIKE '%$search%' OR u.lastname LIKE '%$search%')";
-    }
+    // Search will be handled in unified search logic below
     
     // Activity fields varsa JOIN ekle
     if ($hasActivityFields) {
