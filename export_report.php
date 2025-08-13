@@ -67,13 +67,14 @@ try {
             'shortname' => 'c.shortname',
             'category' => 'cc.name AS category',
             'registrationdate' => 'ue.timecreated AS registrationdate',
-            'progress' => 'CASE 
-                WHEN COALESCE(cstats.total_activities, 0) = 0 THEN 0
-                ELSE ROUND(COALESCE(cstats.completed_activities, 0) * 100.0 / cstats.total_activities, 1)
-            END AS progress',
+            'progress' => 'ROUND(
+                100 * 
+                COALESCE(comp.completed_activities, 0) 
+                / NULLIF(COALESCE(tot.total_activities, 0), 0)
+            , 2) AS progress',
             'completionstatus' => 'CASE WHEN ccmp.timecompleted IS NOT NULL THEN "Tamamlandı" ELSE "Tamamlanmadı" END AS completionstatus',
-            'activitiescompleted' => 'COALESCE(cstats.completed_activities, 0) AS activitiescompleted',
-            'totalactivities' => 'COALESCE(cstats.total_activities, 0) AS totalactivities',
+            'activitiescompleted' => 'COALESCE(comp.completed_activities, 0) AS activitiescompleted',
+            'totalactivities' => 'COALESCE(tot.total_activities, 0) AS totalactivities',
             'completiontime' => 'SEC_TO_TIME(ccmp.timecompleted - ue.timecreated) AS completiontime',
             'activitytimespent' => 'SEC_TO_TIME(IFNULL(logsure.total_time, 0)) AS activitytimespent',
             'startdate' => 'c.startdate',
@@ -198,19 +199,31 @@ try {
         $joins .= ' LEFT JOIN cbd_course_categories cc ON cc.id = c.category';
         $joins .= ' LEFT JOIN cbd_course_completions ccmp ON ccmp.userid = u.id AND ccmp.course = c.id';
         
-        // User-provided completion statistics calculation (exact formula)
+        // User-provided completion statistics calculation (separate JOINs as per user SQL)
         if (in_array('progress', $data['activity']) || in_array('activitiescompleted', $data['activity']) || in_array('totalactivities', $data['activity'])) {
+            
+            // Total activities per course (course-level, user-independent)
             $joins .= ' LEFT JOIN (
-                SELECT 
-                    cm.course as courseid,
-                    cmc.userid,
-                    SUM(CASE WHEN cmc.completionstate > 0 THEN 1 ELSE 0 END) as completed_activities,
-                    SUM(CASE WHEN cm.completion > 0 THEN 1 ELSE 0 END) as total_activities
+                SELECT
+                    cm.course AS courseid,
+                    SUM(CASE WHEN cm.completion > 0 THEN 1 ELSE 0 END) AS total_activities
                 FROM cbd_course_modules cm
-                LEFT JOIN cbd_course_modules_completion cmc ON cmc.coursemoduleid = cm.id AND cmc.userid IS NOT NULL
                 WHERE cm.deletioninprogress = 0
+                GROUP BY cm.course
+            ) tot ON tot.courseid = c.id';
+            
+            // Completed activities per user+course (user+course level)
+            $joins .= ' LEFT JOIN (
+                SELECT
+                    cm.course AS courseid,
+                    cmc.userid,
+                    SUM(CASE WHEN cmc.completionstate IN (1,2) THEN 1 ELSE 0 END) AS completed_activities
+                FROM cbd_course_modules cm
+                JOIN cbd_course_modules_completion cmc ON cmc.coursemoduleid = cm.id
+                WHERE cm.deletioninprogress = 0
+                  AND cm.completion > 0
                 GROUP BY cm.course, cmc.userid
-            ) cstats ON cstats.userid = u.id AND cstats.courseid = c.id';
+            ) comp ON comp.userid = u.id AND comp.courseid = c.id';
         }
         
         // Optimized JOIN for activity time spent calculation - only when needed
