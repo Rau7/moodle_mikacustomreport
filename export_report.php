@@ -223,20 +223,28 @@ try {
                 error_log("Export date range condition: $dateRangeCondition");
             }
             
-            // Improved session-based time estimation (performant but more accurate)
+            // New calculation logic matching the provided SQL
             $joins .= ' LEFT JOIN (
                 SELECT 
-                    l.userid,
-                    l.courseid,
-                    -- Her benzersiz gün için 30 dakika (günlük ortalama oturum)
-                    COUNT(DISTINCT DATE(FROM_UNIXTIME(l.timecreated))) * 1800 + 
-                    -- Aynı gün içinde ekstra aktiviteler için 5 dakika
-                    GREATEST(0, (COUNT(*) - COUNT(DISTINCT DATE(FROM_UNIXTIME(l.timecreated))))) * 300 AS total_time
-                FROM cbd_logstore_standard_log l
-                WHERE l.courseid IS NOT NULL
-                  AND l.target = "course"
-                  AND l.action = "viewed"' . $dateRangeCondition . '
-                GROUP BY l.userid, l.courseid
+                    t.userid,
+                    t.courseid,
+                    SUM(LEAST(GREATEST(t.diff, 0), 1800)) AS total_time
+                FROM (
+                    SELECT
+                        l.userid,
+                        l.courseid,
+                        l.timecreated,
+                        LEAD(l.timecreated) OVER (
+                          PARTITION BY l.userid, l.courseid
+                          ORDER BY l.timecreated
+                        ) - l.timecreated AS diff
+                    FROM cbd_logstore_standard_log l
+                    WHERE l.courseid IS NOT NULL
+                      AND l.action = "viewed"
+                      AND l.target = "course"' . $dateRangeCondition . '
+                ) AS t
+                WHERE t.diff IS NOT NULL
+                GROUP BY t.userid, t.courseid
             ) logsure ON logsure.userid = u.id AND logsure.courseid = c.id';
         }
     }
