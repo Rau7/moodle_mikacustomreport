@@ -70,11 +70,11 @@ try {
             'shortname' => 'c.shortname',
             'category' => 'cc.name AS category',
             'registrationdate' => 'ue.timecreated AS registrationdate',
-            'progress' => 'ROUND(
+            'progress' => 'COALESCE(ROUND(
                 100 * 
                 COALESCE(comp.completed_activities, 0) 
                 / NULLIF(COALESCE(tot.total_activities, 0), 0)
-            , 2) AS progress',
+            , 2), 0) AS progress',
             'completionstatus' => 'CASE WHEN ccmp.timecompleted IS NOT NULL THEN "Tamamlandı" ELSE "Tamamlanmadı" END AS completionstatus',
             'activitiescompleted' => 'COALESCE(comp.completed_activities, 0) AS activitiescompleted',
             'totalactivities' => 'COALESCE(tot.total_activities, 0) AS totalactivities',
