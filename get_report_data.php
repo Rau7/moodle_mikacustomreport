@@ -72,8 +72,17 @@ try {
             'kayityontemi' => 'Kayıt Yöntemi'
         ]
     ];
-
-    // Field mappings - SQL ifadeleri
+    
+    // Get custom profile fields for dynamic mapping
+    $profileFields = $DB->get_records('user_info_field', null, 'sortorder ASC', 'id, shortname, name, datatype');
+    
+    // Add dynamic profile field labels
+    foreach ($profileFields as $field) {
+        $profileFieldKey = 'profile_' . $field->shortname;
+        $fieldLabels['user'][$profileFieldKey] = format_string($field->name);
+    }
+    
+    // Field mappings
     $fieldmaps = [
         'user' => [
             'username' => 'u.username',
@@ -256,6 +265,12 @@ try {
             END AS kayityontemi'
         ]
     ];
+    
+    // Add dynamic profile fields to user fieldmaps
+    foreach ($profileFields as $field) {
+        $profileFieldKey = 'profile_' . $field->shortname;
+        $fieldmaps['user'][$profileFieldKey] = "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}') AS {$profileFieldKey}";
+    }
 
     // SELECT fieldları oluştur
     $selects = [];

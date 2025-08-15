@@ -3,6 +3,15 @@ require('../../config.php');
 require_login();
 require_capability('local/mikacustomreport:view', context_system::instance());
 
+// Get custom profile fields
+$profileFields = $DB->get_records('user_info_field', null, 'sortorder ASC', 'id, shortname, name, datatype');
+$customProfileOptions = '';
+$profileFieldLabels = [];
+foreach ($profileFields as $field) {
+    $customProfileOptions .= '<option value="profile_' . $field->shortname . '">' . format_string($field->name) . '</option>' . "\n";
+    $profileFieldLabels['profile_' . $field->shortname] = format_string($field->name);
+}
+
 $PAGE->set_url(new moodle_url('/local/mikacustomreport/index.php'));
 $PAGE->set_context(context_system::instance());
 $PAGE->set_title('Mika Custom Report');
@@ -65,6 +74,7 @@ echo $OUTPUT->header();
                         <option value="siteilkgiris">Site İlk Giriş Tarihi</option>
                         <option value="sitekayittarihi">Site Kayıt Tarihi</option>
                         <option value="durum">Durum (Aktif/Pasif)</option>
+                        <?php echo $customProfileOptions; ?>
                     </select>
                 </div>
             </div>
@@ -188,6 +198,11 @@ echo $OUTPUT->header();
         </div>
     </div>
 </div>
+
+<script>
+// Dynamic profile field labels from PHP
+window.profileFieldLabels = <?php echo json_encode($profileFieldLabels); ?>;
+</script>
 
 <?php
 echo $OUTPUT->footer();

@@ -38,6 +38,9 @@ try {
         error_log("Export date range detected: {$dateRange['startDate']} to {$dateRange['endDate']}");
     }
 
+    // Get custom profile fields for dynamic mapping
+    $profileFields = $DB->get_records('user_info_field', null, 'sortorder ASC', 'id, shortname, name, datatype');
+    
     // Field mappings - SQL ifadeleri (get_report_data.php'den kopyalandı)
     $fieldmaps = [
         'user' => [
@@ -221,6 +224,12 @@ try {
             END AS kayityontemi'
         ]
     ];
+    
+    // Add dynamic profile fields to user fieldmaps
+    foreach ($profileFields as $field) {
+        $profileFieldKey = 'profile_' . $field->shortname;
+        $fieldmaps['user'][$profileFieldKey] = "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}') AS {$profileFieldKey}";
+    }
 
     // Turkish header mappings for export
     $turkishHeaders = [
@@ -266,6 +275,12 @@ try {
         'guestaccess' => 'Misafir Erişim',
         'kayityontemi' => 'Kayıt Yöntemi'
     ];
+    
+    // Add dynamic profile field Turkish headers
+    foreach ($profileFields as $field) {
+        $profileFieldKey = 'profile_' . $field->shortname;
+        $turkishHeaders[$profileFieldKey] = format_string($field->name);
+    }
     
     // SELECT fieldları oluştur
     $selects = [];
