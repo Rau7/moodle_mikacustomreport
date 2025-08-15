@@ -91,7 +91,36 @@ try {
                 )
             END AS sitesongiris',
             'siteilkgiris' => 'CASE 
-                WHEN u.firstaccess = 0 THEN "Hiç giriş yapmamış"
+                WHEN u.firstaccess = 0 AND u.lastaccess = 0 THEN "Hiç giriş yapmamış"
+                WHEN u.firstaccess = 0 AND u.lastaccess > 0 THEN CONCAT(
+                    CASE DAYOFWEEK(FROM_UNIXTIME(u.lastaccess))
+                        WHEN 1 THEN "Pazar"
+                        WHEN 2 THEN "Pazartesi"
+                        WHEN 3 THEN "Salı"
+                        WHEN 4 THEN "Çarşamba"
+                        WHEN 5 THEN "Perşembe"
+                        WHEN 6 THEN "Cuma"
+                        WHEN 7 THEN "Cumartesi"
+                    END, ", ",
+                    DAY(FROM_UNIXTIME(u.lastaccess)), " ",
+                    CASE MONTH(FROM_UNIXTIME(u.lastaccess))
+                        WHEN 1 THEN "Ocak"
+                        WHEN 2 THEN "Şubat"
+                        WHEN 3 THEN "Mart"
+                        WHEN 4 THEN "Nisan"
+                        WHEN 5 THEN "Mayıs"
+                        WHEN 6 THEN "Haziran"
+                        WHEN 7 THEN "Temmuz"
+                        WHEN 8 THEN "Ağustos"
+                        WHEN 9 THEN "Eylül"
+                        WHEN 10 THEN "Ekim"
+                        WHEN 11 THEN "Kasım"
+                        WHEN 12 THEN "Aralık"
+                    END, " ",
+                    YEAR(FROM_UNIXTIME(u.lastaccess)), ", ",
+                    LPAD(HOUR(FROM_UNIXTIME(u.lastaccess)), 2, "0"), ":",
+                    LPAD(MINUTE(FROM_UNIXTIME(u.lastaccess)), 2, "0")
+                )
                 ELSE CONCAT(
                     CASE DAYOFWEEK(FROM_UNIXTIME(u.firstaccess))
                         WHEN 1 THEN "Pazar"
