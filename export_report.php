@@ -169,7 +169,7 @@ try {
             'activitiescompleted' => 'COALESCE(comp.completed_activities, 0) AS activitiescompleted',
             'totalactivities' => 'COALESCE(tot.total_activities, 0) AS totalactivities',
             'completiontime' => 'SEC_TO_TIME(ccmp.timecompleted - ue.timecreated) AS completiontime',
-            'activitytimespent' => '"0:00:00" AS activitytimespent',  // Will be calculated using block_dedication
+            'activitytimespent' => 'u.id AS userid, c.id AS courseid, "0:00:00" AS activitytimespent',  // Will be calculated using block_dedication
             'dedicationtime' => '"0:00:00" AS dedicationtime',  // Will be calculated in PHP
             'startdate' => 'c.startdate',
             'enddate' => 'c.enddate',
@@ -443,6 +443,11 @@ function exportCSV($sql, $params, $headers, $filename) {
     foreach ($recordset as $record) {
         $row = [];
         foreach ($record as $key => $value) {
+            // Skip userid and courseid from CSV output (they are only for calculations)
+            if ($key === 'userid' || $key === 'courseid' || $key === 'completionstatus' || $key === 'activitytimespent') {
+                continue;
+            }
+            
             // Timestamp alanlarını formatla
             if (in_array($key, ['timecreated', 'lastaccess', 'firstaccess', 'registrationdate', 'startdate', 'enddate']) && $value > 0) {
                 $row[] = userdate($value);
@@ -479,47 +484,65 @@ function exportCSV($sql, $params, $headers, $filename) {
                 }
             }
             
-            // Calculate completion status if completionstatus field is selected
-            $hasCompletionStatusField = $hasActivityFields && in_array('completionstatus', $exportData['activity']);
-            if ($hasCompletionStatusField) {
-                // Get userid and courseid from record
-                $userid = isset($record->userid) ? $record->userid : null;
-                $courseid = isset($record->courseid) ? $record->courseid : null;
-                
-                // Get values from existing fields
-                $timecompleted = null;
-                $progressPercentage = 0;
-                
-                // Check if completiontime field exists and has value (means completed)
-                if (isset($record->completiontime) && $record->completiontime !== null && $record->completiontime !== '00:00:00') {
-                    $timecompleted = 1; // Mark as completed
-                }
-                
-                // Get progress percentage if available
-                if (isset($record->progress)) {
-                    $progressPercentage = floatval($record->progress);
-                }
-                
-                // Get date range for calculation
-                $timestart = $hasDateRange ? strtotime($dateRange['startDate']) : null;
-                $timeend = $hasDateRange ? strtotime($dateRange['endDate']) : null;
-                
-                // Calculate completion status using helper (calculates activitytimespent internally)
-                $completionStatus = dedication_helper::calculate_completion_status(
-                    $userid,
-                    $courseid,
-                    $progressPercentage,
-                    $timecompleted,
-                    $timestart,
-                    $timeend
-                );
-                
-                // Find and update completionstatus column
-                $completionStatusIndex = array_search('completionstatus', array_keys((array)$record));
-                if ($completionStatusIndex !== false) {
-                    $row[$completionStatusIndex] = $completionStatus;
-                }
+        }
+        
+        // Calculate completion status if completionstatus field is selected (EXACT COPY FROM get_report_data.php)
+        $hasCompletionStatusField = $hasActivityFields && in_array('completionstatus', $exportData['activity']);
+        if ($hasCompletionStatusField) {
+            // Get userid and courseid from record (like activitytimespent does)
+            $userid = isset($record->userid) ? $record->userid : null;
+            $courseid = isset($record->courseid) ? $record->courseid : null;
+            
+            // Get values from existing fields
+            $timecompleted = null;
+            $progressPercentage = 0;
+            
+            // Check if completiontime field exists and has value (means completed)
+            if (isset($record->completiontime) && $record->completiontime !== null && $record->completiontime !== '00:00:00') {
+                $timecompleted = 1; // Mark as completed
             }
+            
+            // Get progress percentage if available
+            if (isset($record->progress)) {
+                $progressPercentage = floatval($record->progress);
+            }
+            
+            // Get date range for calculation
+            $timestart = $hasDateRange ? strtotime($dateRange['startDate']) : null;
+            $timeend = $hasDateRange ? strtotime($dateRange['endDate']) : null;
+            
+            // Calculate completion status using helper (calculates activitytimespent internally)
+            $completionStatus = dedication_helper::calculate_completion_status(
+                $userid,
+                $courseid,
+                $progressPercentage,
+                $timecompleted,
+                $timestart,
+                $timeend
+            );
+            
+            // Find and update completionstatus column
+            $completionStatusIndex = array_search('completionstatus', array_keys((array)$record));
+            if ($completionStatusIndex !== false) {
+                $row[$completionStatusIndex] = $completionStatus;
+            }
+            
+            // Add debug info to CSV (like get_report_data.php debug)
+            if (!isset($debugInfo['completionStatusDebug'])) {
+                $debugInfo['completionStatusDebug'] = [];
+            }
+            $debugInfo['completionStatusDebug'][] = [
+                'userid' => $userid,
+                'courseid' => $courseid,
+                'progressPercentage' => $progressPercentage,
+                'timecompleted' => $timecompleted,
+                'completionStatus' => $completionStatus,
+                'completiontime_field' => isset($record->completiontime) ? $record->completiontime : 'not_set',
+                'progress_field' => isset($record->progress) ? $record->progress : 'not_set',
+                'timestart' => $timestart,
+                'timeend' => $timeend,
+                'logic' => 'progress + internal activitytimespent calculation'
+            ];
         }
         
         fputcsv($output, $row);
