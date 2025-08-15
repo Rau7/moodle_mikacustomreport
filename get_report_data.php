@@ -118,7 +118,11 @@ try {
             'dedicationtime' => '"0:00:00" AS dedicationtime',  // Will be calculated in PHP
             'startdate' => 'c.startdate',
             'enddate' => 'c.enddate',
-            'format' => 'c.format',
+            'format' => 'CASE 
+                WHEN c.format = "topics" THEN "Özel Etkinlik"
+                WHEN c.format = "singleactivity" THEN "Tek Etkinlik"
+                ELSE c.format
+            END AS format',
             'completionenabled' => 'c.enablecompletion',
             'guestaccess' => '(SELECT COUNT(*) FROM cbd_enrol e2 WHERE e2.courseid = c.id AND e2.enrol = "guest") AS guestaccess',
             'kayityontemi' => 'CASE 
