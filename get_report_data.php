@@ -269,7 +269,58 @@ try {
     // Add dynamic profile fields to user fieldmaps
     foreach ($profileFields as $field) {
         $profileFieldKey = 'profile_' . $field->shortname;
-        $fieldmaps['user'][$profileFieldKey] = "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}') AS {$profileFieldKey}";
+        
+        // Check if this is a datetime field and format accordingly
+        if ($field->datatype === 'datetime') {
+            // Special formatting for birth date (doğum tarihi) - short format DD/MM/YYYY
+            if (stripos($field->name, 'doğum') !== false || stripos($field->shortname, 'birth') !== false || stripos($field->shortname, 'dogum') !== false) {
+                $fieldmaps['user'][$profileFieldKey] = "CASE 
+                    WHEN (SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}') IS NULL OR (SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}') = '' OR (SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}') = '0' THEN 'Belirtilmemiş'
+                    ELSE CONCAT(
+                        LPAD(DAY(FROM_UNIXTIME((SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}'))), 2, '0'), '/',
+                        LPAD(MONTH(FROM_UNIXTIME((SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}'))), 2, '0'), '/',
+                        YEAR(FROM_UNIXTIME((SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}')))
+                    )
+                END AS {$profileFieldKey}";
+            } else {
+                // For other datetime fields - long Turkish format with day name and time
+                $fieldmaps['user'][$profileFieldKey] = "CASE 
+                    WHEN (SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}') IS NULL OR (SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}') = '' OR (SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}') = '0' THEN 'Belirtilmemiş'
+                    ELSE CONCAT(
+                        CASE DAYOFWEEK(FROM_UNIXTIME((SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}')))
+                            WHEN 1 THEN 'Pazar'
+                            WHEN 2 THEN 'Pazartesi'
+                            WHEN 3 THEN 'Salı'
+                            WHEN 4 THEN 'Çarşamba'
+                            WHEN 5 THEN 'Perşembe'
+                            WHEN 6 THEN 'Cuma'
+                            WHEN 7 THEN 'Cumartesi'
+                        END, ', ',
+                        DAY(FROM_UNIXTIME((SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}'))), ' ',
+                        CASE MONTH(FROM_UNIXTIME((SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}')))
+                            WHEN 1 THEN 'Ocak'
+                            WHEN 2 THEN 'Şubat'
+                            WHEN 3 THEN 'Mart'
+                            WHEN 4 THEN 'Nisan'
+                            WHEN 5 THEN 'Mayıs'
+                            WHEN 6 THEN 'Haziran'
+                            WHEN 7 THEN 'Temmuz'
+                            WHEN 8 THEN 'Ağustos'
+                            WHEN 9 THEN 'Eylül'
+                            WHEN 10 THEN 'Ekim'
+                            WHEN 11 THEN 'Kasım'
+                            WHEN 12 THEN 'Aralık'
+                        END, ' ',
+                        YEAR(FROM_UNIXTIME((SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}'))), ', ',
+                        LPAD(HOUR(FROM_UNIXTIME((SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}'))), 2, '0'), ':',
+                        LPAD(MINUTE(FROM_UNIXTIME((SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}'))), 2, '0')
+                    )
+                END AS {$profileFieldKey}";
+            }
+        } else {
+            // For non-datetime fields, use raw data
+            $fieldmaps['user'][$profileFieldKey] = "(SELECT data FROM cbd_user_info_data d JOIN cbd_user_info_field f ON f.id = d.fieldid WHERE d.userid = u.id AND f.shortname = '{$field->shortname}') AS {$profileFieldKey}";
+        }
     }
 
     // SELECT fieldları oluştur
