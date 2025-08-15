@@ -65,7 +65,10 @@ try {
             'completionstatus' => 'Tamamlanma Durumu',
             'activitiescompleted' => 'Tamamlanan Aktiviteler',
             'totalactivities' => 'Toplam Aktiviteler',
+            'completiontime' => 'Tamamlanma Süresi',
             'activitytimespent' => 'Eğitimde Geçirilen Süre',
+            'startdate' => 'Başlangıç Tarihi',
+            'enddate' => 'Bitiş Tarihi',
             'kayityontemi' => 'Kayıt Yöntemi'
         ]
     ];
