@@ -165,7 +165,7 @@ try {
                 COALESCE(comp.completed_activities, 0) 
                 / NULLIF(COALESCE(tot.total_activities, 0), 0)
             , 2), 0) AS progress',
-            'completionstatus' => 'CASE WHEN ccmp.timecompleted IS NOT NULL THEN "Tamamlandı" ELSE "Tamamlanmadı" END AS completionstatus',
+            'completionstatus' => 'u.id AS userid, c.id AS courseid, "Tamamlanmadı" AS completionstatus',  // Will be calculated in PHP
             'activitiescompleted' => 'COALESCE(comp.completed_activities, 0) AS activitiescompleted',
             'totalactivities' => 'COALESCE(tot.total_activities, 0) AS totalactivities',
             'completiontime' => 'SEC_TO_TIME(ccmp.timecompleted - ue.timecreated) AS completiontime',
@@ -424,8 +424,21 @@ function exportCSV($sql, $params, $headers, $filename) {
     
     // Verileri streaming ile yaz
     $recordset = $DB->get_recordset_sql($sql, $params);
-    $hasDedicationField = $hasActivityFields && in_array('dedicationtime', $data['activity']);
-    $hasActivityTimeField = $hasActivityFields && in_array('activitytimespent', $data['activity']);
+    
+    // Get data from POST for field calculations
+    if (isset($_POST['data'])) {
+        $exportData = json_decode($_POST['data'], true);
+    } else {
+        $exportData = json_decode(file_get_contents('php://input'), true);
+    }
+    
+    $hasActivityFields = !empty($exportData['activity']) && is_array($exportData['activity']);
+    $hasDedicationField = $hasActivityFields && in_array('dedicationtime', $exportData['activity']);
+    $hasActivityTimeField = $hasActivityFields && in_array('activitytimespent', $exportData['activity']);
+    
+    // Date range for calculations
+    $dateRange = isset($exportData['dateRange']) ? $exportData['dateRange'] : null;
+    $hasDateRange = $dateRange !== null && !empty($dateRange['startDate']) && !empty($dateRange['endDate']);
     
     foreach ($recordset as $record) {
         $row = [];
@@ -463,6 +476,48 @@ function exportCSV($sql, $params, $headers, $filename) {
                 $activityIndex = array_search('activitytimespent', array_keys((array)$record));
                 if ($activityIndex !== false) {
                     $row[$activityIndex] = $formattedTime;
+                }
+            }
+            
+            // Calculate completion status if completionstatus field is selected
+            $hasCompletionStatusField = $hasActivityFields && in_array('completionstatus', $exportData['activity']);
+            if ($hasCompletionStatusField) {
+                // Get userid and courseid from record
+                $userid = isset($record->userid) ? $record->userid : null;
+                $courseid = isset($record->courseid) ? $record->courseid : null;
+                
+                // Get values from existing fields
+                $timecompleted = null;
+                $progressPercentage = 0;
+                
+                // Check if completiontime field exists and has value (means completed)
+                if (isset($record->completiontime) && $record->completiontime !== null && $record->completiontime !== '00:00:00') {
+                    $timecompleted = 1; // Mark as completed
+                }
+                
+                // Get progress percentage if available
+                if (isset($record->progress)) {
+                    $progressPercentage = floatval($record->progress);
+                }
+                
+                // Get date range for calculation
+                $timestart = $hasDateRange ? strtotime($dateRange['startDate']) : null;
+                $timeend = $hasDateRange ? strtotime($dateRange['endDate']) : null;
+                
+                // Calculate completion status using helper (calculates activitytimespent internally)
+                $completionStatus = dedication_helper::calculate_completion_status(
+                    $userid,
+                    $courseid,
+                    $progressPercentage,
+                    $timecompleted,
+                    $timestart,
+                    $timeend
+                );
+                
+                // Find and update completionstatus column
+                $completionStatusIndex = array_search('completionstatus', array_keys((array)$record));
+                if ($completionStatusIndex !== false) {
+                    $row[$completionStatusIndex] = $completionStatus;
                 }
             }
         }

@@ -218,6 +218,40 @@ class dedication_helper {
     }
     
     /**
+     * Calculate completion status based on progress and internal activitytimespent calculation
+     * 
+     * @param int $userid User ID
+     * @param int $courseid Course ID
+     * @param float $progressPercentage Progress percentage (0-100)
+     * @param int|null $timecompleted Completion timestamp (null if not completed)
+     * @param int|null $timestart Start time for calculation (optional)
+     * @param int|null $timeend End time for calculation (optional)
+     * @return string 'Tamamlandı', 'Devam Ediyor', or 'Tamamlanmadı'
+     */
+    public static function calculate_completion_status($userid, $courseid, $progressPercentage, $timecompleted = null, $timestart = null, $timeend = null) {
+        // Calculate activity time spent internally
+        $dedicationResult = self::calculate_dedication_time($userid, $courseid, $timestart, $timeend, false);
+        $activityTimeSeconds = is_array($dedicationResult) ? $dedicationResult['finalResult'] : $dedicationResult;
+        // If progress is 100%, return 'Tamamlandı' (regardless of timecompleted)
+        if ($progressPercentage >= 100) {
+            return 'Tamamlandı';
+        }
+        
+        // If progress > 0 but < 100, return 'Devam Ediyor'
+        if ($progressPercentage > 0 && $progressPercentage < 100) {
+            return 'Devam Ediyor';
+        }
+        
+        // If progress = 0 but user spent time in activity, return 'Devam Ediyor'
+        if ($progressPercentage == 0 && $activityTimeSeconds > 0) {
+            return 'Devam Ediyor';
+        }
+        
+        // If progress = 0 and no time spent, return 'Tamamlanmadı'
+        return 'Tamamlanmadı';
+    }
+    
+    /**
      * Check if block_dedication is available
      * 
      * @return bool True if available, false otherwise

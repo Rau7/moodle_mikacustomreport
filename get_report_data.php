@@ -200,7 +200,7 @@ try {
                 COALESCE(comp.completed_activities, 0) 
                 / NULLIF(COALESCE(tot.total_activities, 0), 0)
             , 2), 0) AS progress',
-            'completionstatus' => 'CASE WHEN ccmp.timecompleted IS NOT NULL THEN "Tamamlandı" ELSE "Tamamlanmadı" END AS completionstatus',
+            'completionstatus' => 'u.id AS userid, c.id AS courseid, "Tamamlanmadı" AS completionstatus',  // Will be calculated in PHP
             'activitiescompleted' => 'COALESCE(comp.completed_activities, 0) AS activitiescompleted',
             'totalactivities' => 'COALESCE(tot.total_activities, 0) AS totalactivities',
             'completiontime' => 'SEC_TO_TIME(ccmp.timecompleted - ue.timecreated) AS completiontime',
@@ -537,6 +537,62 @@ try {
             if ($hasActivityTimeField) {
                 $row['activitytimespent'] = $formattedTime;
             }
+            
+        }
+        
+        // Calculate completion status if completionstatus field is selected
+        $hasCompletionStatusField = $hasActivityFields && in_array('completionstatus', $data['activity']);
+        if ($hasCompletionStatusField) {
+            // Get userid and courseid from row (like activitytimespent does)
+            $userid = isset($row['userid']) ? $row['userid'] : null;
+            $courseid = isset($row['courseid']) ? $row['courseid'] : null;
+            
+            // Get values from existing fields
+            $timecompleted = null;
+            $progressPercentage = 0;
+            
+            // Check if completiontime field exists and has value (means completed)
+            if (isset($row['completiontime']) && $row['completiontime'] !== null && $row['completiontime'] !== '00:00:00') {
+                $timecompleted = 1; // Mark as completed
+            }
+            
+            // Get progress percentage if available
+            if (isset($row['progress'])) {
+                $progressPercentage = floatval($row['progress']);
+            }
+            
+            // Get date range for calculation
+            $timestart = $hasDateRange ? strtotime($dateRange['startDate']) : null;
+            $timeend = $hasDateRange ? strtotime($dateRange['endDate']) : null;
+            
+            // Calculate completion status using helper (calculates activitytimespent internally)
+            $completionStatus = dedication_helper::calculate_completion_status(
+                $userid,
+                $courseid,
+                $progressPercentage,
+                $timecompleted,
+                $timestart,
+                $timeend
+            );
+            
+            $row['completionstatus'] = $completionStatus;
+            
+            // Add debug info
+            if (!isset($debugInfo['completionStatusDebug'])) {
+                $debugInfo['completionStatusDebug'] = [];
+            }
+            $debugInfo['completionStatusDebug'][] = [
+                'userid' => $userid,
+                'courseid' => $courseid,
+                'progressPercentage' => $progressPercentage,
+                'timecompleted' => $timecompleted,
+                'completionStatus' => $completionStatus,
+                'completiontime_field' => isset($row['completiontime']) ? $row['completiontime'] : 'not_set',
+                'progress_field' => isset($row['progress']) ? $row['progress'] : 'not_set',
+                'timestart' => $timestart,
+                'timeend' => $timeend,
+                'logic' => 'progress + internal activitytimespent calculation'
+            ];
         }
         
         $output[] = $row;
