@@ -58,9 +58,99 @@ try {
             'sicil' => 'u.phone1 AS sicil',
             'tc' => 'u.idnumber AS tc',
             'ceptelefonu' => 'u.phone2 AS ceptelefonu',
-            'sitesongiris' => 'u.lastaccess AS sitesongiris',
-            'siteilkgiris' => 'u.firstaccess AS siteilkgiris',
-            'sitekayittarihi' => 'u.timecreated AS sitekayittarihi',
+            'sitesongiris' => 'CASE 
+                WHEN u.lastaccess = 0 THEN "Hiç giriş yapmamış"
+                ELSE CONCAT(
+                    CASE DAYOFWEEK(FROM_UNIXTIME(u.lastaccess))
+                        WHEN 1 THEN "Pazar"
+                        WHEN 2 THEN "Pazartesi"
+                        WHEN 3 THEN "Salı"
+                        WHEN 4 THEN "Çarşamba"
+                        WHEN 5 THEN "Perşembe"
+                        WHEN 6 THEN "Cuma"
+                        WHEN 7 THEN "Cumartesi"
+                    END, ", ",
+                    DAY(FROM_UNIXTIME(u.lastaccess)), " ",
+                    CASE MONTH(FROM_UNIXTIME(u.lastaccess))
+                        WHEN 1 THEN "Ocak"
+                        WHEN 2 THEN "Şubat"
+                        WHEN 3 THEN "Mart"
+                        WHEN 4 THEN "Nisan"
+                        WHEN 5 THEN "Mayıs"
+                        WHEN 6 THEN "Haziran"
+                        WHEN 7 THEN "Temmuz"
+                        WHEN 8 THEN "Ağustos"
+                        WHEN 9 THEN "Eylül"
+                        WHEN 10 THEN "Ekim"
+                        WHEN 11 THEN "Kasım"
+                        WHEN 12 THEN "Aralık"
+                    END, " ",
+                    YEAR(FROM_UNIXTIME(u.lastaccess)), ", ",
+                    LPAD(HOUR(FROM_UNIXTIME(u.lastaccess)), 2, "0"), ":",
+                    LPAD(MINUTE(FROM_UNIXTIME(u.lastaccess)), 2, "0")
+                )
+            END AS sitesongiris',
+            'siteilkgiris' => 'CASE 
+                WHEN u.firstaccess = 0 THEN "Hiç giriş yapmamış"
+                ELSE CONCAT(
+                    CASE DAYOFWEEK(FROM_UNIXTIME(u.firstaccess))
+                        WHEN 1 THEN "Pazar"
+                        WHEN 2 THEN "Pazartesi"
+                        WHEN 3 THEN "Salı"
+                        WHEN 4 THEN "Çarşamba"
+                        WHEN 5 THEN "Perşembe"
+                        WHEN 6 THEN "Cuma"
+                        WHEN 7 THEN "Cumartesi"
+                    END, ", ",
+                    DAY(FROM_UNIXTIME(u.firstaccess)), " ",
+                    CASE MONTH(FROM_UNIXTIME(u.firstaccess))
+                        WHEN 1 THEN "Ocak"
+                        WHEN 2 THEN "Şubat"
+                        WHEN 3 THEN "Mart"
+                        WHEN 4 THEN "Nisan"
+                        WHEN 5 THEN "Mayıs"
+                        WHEN 6 THEN "Haziran"
+                        WHEN 7 THEN "Temmuz"
+                        WHEN 8 THEN "Ağustos"
+                        WHEN 9 THEN "Eylül"
+                        WHEN 10 THEN "Ekim"
+                        WHEN 11 THEN "Kasım"
+                        WHEN 12 THEN "Aralık"
+                    END, " ",
+                    YEAR(FROM_UNIXTIME(u.firstaccess)), ", ",
+                    LPAD(HOUR(FROM_UNIXTIME(u.firstaccess)), 2, "0"), ":",
+                    LPAD(MINUTE(FROM_UNIXTIME(u.firstaccess)), 2, "0")
+                )
+            END AS siteilkgiris',
+            'sitekayittarihi' => 'CONCAT(
+                CASE DAYOFWEEK(FROM_UNIXTIME(u.timecreated))
+                    WHEN 1 THEN "Pazar"
+                    WHEN 2 THEN "Pazartesi"
+                    WHEN 3 THEN "Salı"
+                    WHEN 4 THEN "Çarşamba"
+                    WHEN 5 THEN "Perşembe"
+                    WHEN 6 THEN "Cuma"
+                    WHEN 7 THEN "Cumartesi"
+                END, ", ",
+                DAY(FROM_UNIXTIME(u.timecreated)), " ",
+                CASE MONTH(FROM_UNIXTIME(u.timecreated))
+                    WHEN 1 THEN "Ocak"
+                    WHEN 2 THEN "Şubat"
+                    WHEN 3 THEN "Mart"
+                    WHEN 4 THEN "Nisan"
+                    WHEN 5 THEN "Mayıs"
+                    WHEN 6 THEN "Haziran"
+                    WHEN 7 THEN "Temmuz"
+                    WHEN 8 THEN "Ağustos"
+                    WHEN 9 THEN "Eylül"
+                    WHEN 10 THEN "Ekim"
+                    WHEN 11 THEN "Kasım"
+                    WHEN 12 THEN "Aralık"
+                END, " ",
+                YEAR(FROM_UNIXTIME(u.timecreated)), ", ",
+                LPAD(HOUR(FROM_UNIXTIME(u.timecreated)), 2, "0"), ":",
+                LPAD(MINUTE(FROM_UNIXTIME(u.timecreated)), 2, "0")
+            ) AS sitekayittarihi',
             'durum' => 'CASE WHEN u.suspended = 0 THEN "Aktif" ELSE "Pasif" END AS durum'
         ],
         'activity' => [
