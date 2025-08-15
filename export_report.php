@@ -3,6 +3,9 @@ require('../../config.php');
 require_login();
 require_capability('local/mikacustomreport:view', context_system::instance());
 
+// Include dedication helper
+require_once(__DIR__ . '/dedication_helper.php');
+
 // POST verilerini al
 if (isset($_POST['data'])) {
     // Form submission'dan gelen data
@@ -76,7 +79,8 @@ try {
             'activitiescompleted' => 'COALESCE(comp.completed_activities, 0) AS activitiescompleted',
             'totalactivities' => 'COALESCE(tot.total_activities, 0) AS totalactivities',
             'completiontime' => 'SEC_TO_TIME(ccmp.timecompleted - ue.timecreated) AS completiontime',
-            'activitytimespent' => 'SEC_TO_TIME(IFNULL(logsure.total_time, 0)) AS activitytimespent',
+            'activitytimespent' => '"0:00:00" AS activitytimespent',  // Will be calculated using block_dedication
+            'dedicationtime' => '"0:00:00" AS dedicationtime',  // Will be calculated in PHP
             'startdate' => 'c.startdate',
             'enddate' => 'c.enddate',
             'format' => 'c.format',
@@ -131,6 +135,7 @@ try {
         'totalactivities' => 'Toplam Aktiviteler',
         'completiontime' => 'Tamamlanma Süresi',
         'activitytimespent' => 'Eğitimde Geçirilen Süre',
+        'dedicationtime' => 'Dedication Süresi',
         'startdate' => 'Başlangıç Tarihi',
         'enddate' => 'Bitiş Tarihi',
         'format' => 'Format',
@@ -226,40 +231,7 @@ try {
             ) comp ON comp.userid = u.id AND comp.courseid = c.id';
         }
         
-        // Optimized JOIN for activity time spent calculation - only when needed
-        if (in_array('activitytimespent', $data['activity'])) {
-            $dateRangeCondition = '';
-            if ($hasDateRange) {
-                $startTimestamp = strtotime($dateRange['startDate']);
-                $endTimestamp = strtotime($dateRange['endDate'] . ' 23:59:59'); // End of day
-                $dateRangeCondition = " AND l.timecreated BETWEEN $startTimestamp AND $endTimestamp";
-                error_log("Export date range condition: $dateRangeCondition");
-            }
-            
-            // New calculation logic matching the provided SQL
-            $joins .= ' LEFT JOIN (
-                SELECT 
-                    t.userid,
-                    t.courseid,
-                    SUM(LEAST(GREATEST(t.diff, 0), 1800)) AS total_time
-                FROM (
-                    SELECT
-                        l.userid,
-                        l.courseid,
-                        l.timecreated,
-                        LEAD(l.timecreated) OVER (
-                          PARTITION BY l.userid, l.courseid
-                          ORDER BY l.timecreated
-                        ) - l.timecreated AS diff
-                    FROM cbd_logstore_standard_log l
-                    WHERE l.courseid IS NOT NULL
-                      AND l.action = "viewed"
-                      AND l.target = "course"' . $dateRangeCondition . '
-                ) AS t
-                WHERE t.diff IS NOT NULL
-                GROUP BY t.userid, t.courseid
-            ) logsure ON logsure.userid = u.id AND logsure.courseid = c.id';
-        }
+        // activitytimespent is now calculated in PHP using block_dedication - no SQL JOIN needed
     }
 
     // Arama filtresi (eğer varsa)
@@ -358,6 +330,9 @@ function exportCSV($sql, $params, $headers, $filename) {
     
     // Verileri streaming ile yaz
     $recordset = $DB->get_recordset_sql($sql, $params);
+    $hasDedicationField = $hasActivityFields && in_array('dedicationtime', $data['activity']);
+    $hasActivityTimeField = $hasActivityFields && in_array('activitytimespent', $data['activity']);
+    
     foreach ($recordset as $record) {
         $row = [];
         foreach ($record as $key => $value) {
@@ -368,6 +343,36 @@ function exportCSV($sql, $params, $headers, $filename) {
                 $row[] = $value;
             }
         }
+        
+        // Dedication time hesapla (eğer seçilmişse ve block_dedication mevcutsa)
+        if (($hasDedicationField || $hasActivityTimeField) && isset($record->userid) && isset($record->courseid)) {
+            $timestart = $hasDateRange ? strtotime($dateRange['startDate']) : null;
+            $timeend = $hasDateRange ? strtotime($dateRange['endDate']) : null;
+            
+            $dedicationSeconds = dedication_helper::calculate_dedication_time(
+                $record->userid, 
+                $record->courseid, 
+                $timestart, 
+                $timeend
+            );
+            
+            $formattedTime = dedication_helper::format_dedication_time($dedicationSeconds);
+            
+            // Find and update column indexes
+            if ($hasDedicationField) {
+                $dedicationIndex = array_search('dedicationtime', array_keys((array)$record));
+                if ($dedicationIndex !== false) {
+                    $row[$dedicationIndex] = $formattedTime;
+                }
+            }
+            if ($hasActivityTimeField) {
+                $activityIndex = array_search('activitytimespent', array_keys((array)$record));
+                if ($activityIndex !== false) {
+                    $row[$activityIndex] = $formattedTime;
+                }
+            }
+        }
+        
         fputcsv($output, $row);
     }
     

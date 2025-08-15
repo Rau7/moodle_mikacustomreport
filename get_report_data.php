@@ -3,6 +3,9 @@ require('../../config.php');
 require_login();
 require_capability('local/mikacustomreport:view', context_system::instance());
 
+// Include dedication helper
+require_once(__DIR__ . '/dedication_helper.php');
+
 header('Content-Type: application/json');
 
 // POST verilerini al
@@ -108,7 +111,8 @@ try {
             'activitiescompleted' => 'COALESCE(comp.completed_activities, 0) AS activitiescompleted',
             'totalactivities' => 'COALESCE(tot.total_activities, 0) AS totalactivities',
             'completiontime' => 'SEC_TO_TIME(ccmp.timecompleted - ue.timecreated) AS completiontime',
-            'activitytimespent' => 'SEC_TO_TIME(IFNULL(logsure.total_time, 0)) AS activitytimespent',
+            'activitytimespent' => 'u.id AS userid, c.id AS courseid, "0:00:00" AS activitytimespent',  // Will be calculated using block_dedication
+            'dedicationtime' => '"0:00:00" AS dedicationtime',  // Will be calculated in PHP
             'startdate' => 'c.startdate',
             'enddate' => 'c.enddate',
             'format' => 'c.format',
@@ -241,40 +245,7 @@ try {
             ) comp ON comp.userid = u.id AND comp.courseid = c.id';
         }
         
-        // UPDATED: New time calculation logic based on LEAD window function
-        if (in_array('activitytimespent', $data['activity'])) {
-            $dateRangeCondition = '';
-            if ($hasDateRange) {
-                $startTimestamp = strtotime($dateRange['startDate']);
-                $endTimestamp = strtotime($dateRange['endDate'] . ' 23:59:59'); // End of day
-                $dateRangeCondition = " AND l.timecreated >= $startTimestamp AND l.timecreated < $endTimestamp";
-                error_log("Date range condition: $dateRangeCondition");
-            }
-            
-            // New calculation logic matching the provided SQL
-            $joins .= ' LEFT JOIN (
-                SELECT 
-                    t.userid,
-                    t.courseid,
-                    SUM(LEAST(GREATEST(t.diff, 0), 1800)) AS total_time
-                FROM (
-                    SELECT
-                        l.userid,
-                        l.courseid,
-                        l.timecreated,
-                        LEAD(l.timecreated) OVER (
-                          PARTITION BY l.userid, l.courseid
-                          ORDER BY l.timecreated
-                        ) - l.timecreated AS diff
-                    FROM cbd_logstore_standard_log l
-                    WHERE l.courseid IS NOT NULL
-                      AND l.action = "viewed"
-                      AND l.target = "course"' . $dateRangeCondition . '
-                ) AS t
-                WHERE t.diff IS NOT NULL
-                GROUP BY t.userid, t.courseid
-            ) logsure ON logsure.userid = u.id AND logsure.courseid = c.id';
-        }
+        // activitytimespent is now calculated in PHP using block_dedication - no SQL JOIN needed
     }
 
     // Arama filtresi ekle
@@ -403,7 +374,21 @@ try {
     
     // Output formatla
     $output = [];
+    $hasDedicationField = $hasActivityFields && in_array('dedicationtime', $data['activity']);
+    $hasActivityTimeField = $hasActivityFields && in_array('activitytimespent', $data['activity']);
+    
+    // Prepare debug info for JSON response
+    $debugInfo = [
+        'hasActivityFields' => $hasActivityFields,
+        'hasActivityTimeField' => $hasActivityTimeField,
+        'activityFields' => isset($data['activity']) ? $data['activity'] : [],
+        'dedicationFunctionCalls' => 0,
+        'recordsProcessed' => 0
+    ];
+    
     foreach ($recordset as $record) {
+        $debugInfo['recordsProcessed']++;
+        
         $row = [];
         foreach ($record as $key => $value) {
             // Timestamp alanlarını formatla
@@ -413,6 +398,50 @@ try {
                 $row[$key] = $value;
             }
         }
+        
+        // Track record data for debug
+        $debugInfo['sampleRecord'] = [
+            'hasUserid' => isset($record->userid),
+            'hasCourseid' => isset($record->courseid),
+            'userid' => isset($record->userid) ? $record->userid : 'NOT SET',
+            'courseid' => isset($record->courseid) ? $record->courseid : 'NOT SET'
+        ];
+        
+        // Dedication time hesapla (eğer seçilmişse ve block_dedication mevcutsa)
+        if (($hasDedicationField || $hasActivityTimeField) && isset($record->userid) && isset($record->courseid)) {
+            $debugInfo['dedicationFunctionCalls']++;
+            
+            $timestart = $hasDateRange ? strtotime($dateRange['startDate']) : null;
+            $timeend = $hasDateRange ? strtotime($dateRange['endDate']) : null;
+            
+            // Calculate dedication time using block_dedication manager with debug info
+            $dedicationResult = dedication_helper::calculate_dedication_time(
+                $record->userid,
+                $record->courseid,
+                $timestart,
+                $timeend,
+                true  // Return debug info
+            );
+            
+            // Store debug info for first record
+            if (!isset($debugInfo['dedicationDebug'])) {
+                $debugInfo['dedicationDebug'] = $dedicationResult;
+            }
+            
+            // Get actual seconds for formatting
+            $dedicationSeconds = is_array($dedicationResult) ? $dedicationResult['finalResult'] : $dedicationResult;
+            
+            // Format the time
+            $formattedTime = dedication_helper::format_dedication_time($dedicationSeconds);
+            
+            if ($hasDedicationField) {
+                $row['dedicationtime'] = $formattedTime;
+            }
+            if ($hasActivityTimeField) {
+                $row['activitytimespent'] = $formattedTime;
+            }
+        }
+        
         $output[] = $row;
     }
     
@@ -425,7 +454,7 @@ try {
         'recordsTotal' => intval($totalRecords),
         'recordsFiltered' => intval($totalRecords), // Arama sonrası kayıt sayısı
         'data' => $output,
-        'debug' => [
+        'debug' => array_merge([
             'countSql' => $countSql,
             'dataSql' => $dataSql,
             'totalRecords' => $totalRecords,
@@ -434,7 +463,7 @@ try {
             'search' => $search,
             'hasUserFields' => $hasUserFields,
             'hasActivityFields' => $hasActivityFields
-        ]
+        ], $debugInfo)
     ]);
 
 } catch (Exception $e) {
