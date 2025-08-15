@@ -59,11 +59,11 @@ echo $OUTPUT->header();
                         <option value="firstname">Ad</option>
                         <option value="lastname">Soyad</option>
                         <option value="timespent">Sitede Geçirilen Zaman</option>
-                        <option value="start">Başlangıç Tarihi (Özel)</option>
+                        <!--<option value="start">Başlangıç Tarihi (Özel)</option>
                         <option value="bolum">Bölüm (Özel)</option>
                         <option value="end">Bitiş Tarihi (Özel)</option>
                         <option value="departman">Departman</option>
-                        <option value="position">Pozisyon (Özel)</option>
+                        <option value="position">Pozisyon (Özel)</option>-->
                         <option value="unvan">Unvan</option>
                         <option value="adres">Adres</option>
                         <option value="birim">Birim</option>
