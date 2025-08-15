@@ -306,6 +306,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (allFields.length === 0) {
       console.log("No fields selected, hiding table");
       $("#report-table").hide();
+      hideLoading(); // Loading screen'i gizle
       return;
     }
 
