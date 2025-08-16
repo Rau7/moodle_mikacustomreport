@@ -26,7 +26,10 @@ $format = isset($data['format']) ? $data['format'] : 'csv';
 $filename = 'mikacustomreport_' . date('Y-m-d_H-i-s');
 
 try {
-    // Hangi fieldlar seçilmiş kontrol et
+    // Basit yaklaşım: Eski export mantığını kullan ama sıralamayı düzelt
+    // DataTable'da görünen veriyi export et
+    
+    // Hangi fieldlar seçilmiş kontrol et (header için)
     $hasUserFields = !empty($data['user']) && is_array($data['user']);
     $hasActivityFields = !empty($data['activity']) && is_array($data['activity']);
     
@@ -520,124 +523,18 @@ function exportCSV($sql, $params, $headers, $filename) {
     // Verileri streaming ile yaz
     $recordset = $DB->get_recordset_sql($sql, $params);
     
-    // Get data from POST for field calculations
-    if (isset($_POST['data'])) {
-        $exportData = json_decode($_POST['data'], true);
-    } else {
-        $exportData = json_decode(file_get_contents('php://input'), true);
-    }
-    
-    $hasActivityFields = !empty($exportData['activity']) && is_array($exportData['activity']);
-    $hasDedicationField = $hasActivityFields && in_array('dedicationtime', $exportData['activity']);
-    $hasActivityTimeField = $hasActivityFields && in_array('activitytimespent', $exportData['activity']);
-    
-    // Date range for calculations
-    $dateRange = isset($exportData['dateRange']) ? $exportData['dateRange'] : null;
-    $hasDateRange = $dateRange !== null && !empty($dateRange['startDate']) && !empty($dateRange['endDate']);
-    
     foreach ($recordset as $record) {
         $row = [];
         foreach ($record as $key => $value) {
-            // Skip userid and courseid from CSV output (they are only for calculations)
-            if ($key === 'userid' || $key === 'courseid' || $key === 'completionstatus' || $key === 'activitytimespent') {
+            if ($key == 'userid' || $key == 'courseid') {
                 continue;
             }
-            
             // Timestamp alanlarını formatla
             if (in_array($key, ['timecreated', 'lastaccess', 'firstaccess', 'registrationdate', 'startdate', 'enddate']) && $value > 0) {
                 $row[] = userdate($value);
             } else {
                 $row[] = $value;
             }
-        }
-        
-        // Dedication time hesapla (eğer seçilmişse ve block_dedication mevcutsa)
-        if (($hasDedicationField || $hasActivityTimeField) && isset($record->userid) && isset($record->courseid)) {
-            $timestart = $hasDateRange ? strtotime($dateRange['startDate']) : null;
-            $timeend = $hasDateRange ? strtotime($dateRange['endDate']) : null;
-            
-            $dedicationSeconds = dedication_helper::calculate_dedication_time(
-                $record->userid, 
-                $record->courseid, 
-                $timestart, 
-                $timeend
-            );
-            
-            $formattedTime = dedication_helper::format_dedication_time($dedicationSeconds);
-            
-            // Find and update column indexes
-            if ($hasDedicationField) {
-                $dedicationIndex = array_search('dedicationtime', array_keys((array)$record));
-                if ($dedicationIndex !== false) {
-                    $row[$dedicationIndex] = $formattedTime;
-                }
-            }
-            if ($hasActivityTimeField) {
-                $activityIndex = array_search('activitytimespent', array_keys((array)$record));
-                if ($activityIndex !== false) {
-                    $row[$activityIndex] = $formattedTime;
-                }
-            }
-            
-        }
-        
-        // Calculate completion status if completionstatus field is selected (EXACT COPY FROM get_report_data.php)
-        $hasCompletionStatusField = $hasActivityFields && in_array('completionstatus', $exportData['activity']);
-        if ($hasCompletionStatusField) {
-            // Get userid and courseid from record (like activitytimespent does)
-            $userid = isset($record->userid) ? $record->userid : null;
-            $courseid = isset($record->courseid) ? $record->courseid : null;
-            
-            // Get values from existing fields
-            $timecompleted = null;
-            $progressPercentage = 0;
-            
-            // Check if completiontime field exists and has value (means completed)
-            if (isset($record->completiontime) && $record->completiontime !== null && $record->completiontime !== '00:00:00') {
-                $timecompleted = 1; // Mark as completed
-            }
-            
-            // Get progress percentage if available
-            if (isset($record->progress)) {
-                $progressPercentage = floatval($record->progress);
-            }
-            
-            // Get date range for calculation
-            $timestart = $hasDateRange ? strtotime($dateRange['startDate']) : null;
-            $timeend = $hasDateRange ? strtotime($dateRange['endDate']) : null;
-            
-            // Calculate completion status using helper (calculates activitytimespent internally)
-            $completionStatus = dedication_helper::calculate_completion_status(
-                $userid,
-                $courseid,
-                $progressPercentage,
-                $timecompleted,
-                $timestart,
-                $timeend
-            );
-            
-            // Find and update completionstatus column
-            $completionStatusIndex = array_search('completionstatus', array_keys((array)$record));
-            if ($completionStatusIndex !== false) {
-                $row[$completionStatusIndex] = $completionStatus;
-            }
-            
-            // Add debug info to CSV (like get_report_data.php debug)
-            if (!isset($debugInfo['completionStatusDebug'])) {
-                $debugInfo['completionStatusDebug'] = [];
-            }
-            $debugInfo['completionStatusDebug'][] = [
-                'userid' => $userid,
-                'courseid' => $courseid,
-                'progressPercentage' => $progressPercentage,
-                'timecompleted' => $timecompleted,
-                'completionStatus' => $completionStatus,
-                'completiontime_field' => isset($record->completiontime) ? $record->completiontime : 'not_set',
-                'progress_field' => isset($record->progress) ? $record->progress : 'not_set',
-                'timestart' => $timestart,
-                'timeend' => $timeend,
-                'logic' => 'progress + internal activitytimespent calculation'
-            ];
         }
         
         fputcsv($output, $row);
@@ -649,14 +546,12 @@ function exportCSV($sql, $params, $headers, $filename) {
 }
 
 function exportExcel($sql, $params, $headers, $filename) {
-    // Excel export için SimpleXLSXGen kullanabiliriz
-    // Şimdilik CSV olarak export edelim
+    // Excel export placeholder - use CSV for now
     exportCSV($sql, $params, $headers, $filename);
 }
 
 function exportPDF($sql, $params, $headers, $filename) {
-    // PDF export için TCPDF kullanabiliriz  
-    // Şimdilik CSV olarak export edelim
+    // PDF export placeholder - use CSV for now
     exportCSV($sql, $params, $headers, $filename);
 }
 ?>
