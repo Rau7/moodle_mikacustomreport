@@ -1,3 +1,3 @@
 <?php
-$string['pluginname'] = 'Mika Custom Report';
-$string['mikacustomreport'] = 'Mika Custom Report';
+$string['pluginname'] = 'Özel Rapor';
+$string['mikacustomreport'] = 'Özel Rapor';

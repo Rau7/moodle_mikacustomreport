@@ -14,8 +14,8 @@ foreach ($profileFields as $field) {
 
 $PAGE->set_url(new moodle_url('/local/mikacustomreport/index.php'));
 $PAGE->set_context(context_system::instance());
-$PAGE->set_title('Mika Custom Report');
-$PAGE->set_heading('Mika Custom Report');
+$PAGE->set_title('Özel Rapor');
+$PAGE->set_heading('Özel Rapor');
 
 // jQuery CDN
 $PAGE->requires->js(new moodle_url('https://code.jquery.com/jquery-3.7.0.min.js'), true);
@@ -90,6 +90,7 @@ echo $OUTPUT->header();
                         <option value="activitiescompleted">Tamamlanan Aktiviteler</option>
                         <option value="totalactivities">Toplam Aktiviteler</option>
                         <option value="completiontime">Tamamlanma Süresi</option>
+                        <option value="completiondate">Tamamlanma Tarihi</option>
                         <option value="activitytimespent">Etkinlikte Geçirilen Zaman</option>
                         <option value="startdate">Başlangıç Tarihi</option>
                         <option value="enddate">Bitiş Tarihi</option>
