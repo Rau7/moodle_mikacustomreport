@@ -85,6 +85,7 @@ echo $OUTPUT->header();
                         <option value="activityname">Etkinlik Adı</option>
                         <option value="category">Kategori</option>
                         <option value="registrationdate">Kayıt Tarihi</option>
+                        <option value="enrollmentenddate">Kayıt Bitiş Tarihi</option>
                         <option value="progress">İlerleme (%)</option>
                         <option value="completionstatus">Tamamlanma Durumu</option>
                         <option value="activitiescompleted">Tamamlanan Aktiviteler</option>

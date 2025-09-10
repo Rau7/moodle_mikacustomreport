@@ -61,6 +61,7 @@ try {
             'activityname' => 'Etkinlik Adı',
             'category' => 'Kategori',
             'registrationdate' => 'Kayıt Tarihi',
+            'enrollmentenddate' => 'Kayıt Bitiş Tarihi',
             'progress' => 'İlerleme (%)',
             'completionstatus' => 'Tamamlanma Durumu',
             'activitiescompleted' => 'Tamamlanan Aktiviteler',
@@ -234,6 +235,38 @@ try {
             'shortname' => 'c.shortname',
             'category' => 'cc.name AS category',
             'registrationdate' => 'ue.timecreated AS registrationdate',
+            'enrollmentenddate' => 'CASE 
+                WHEN ue.timeend IS NULL OR ue.timeend = 0 THEN "Süresiz"
+                ELSE CONCAT(
+                    CASE DAYOFWEEK(FROM_UNIXTIME(ue.timeend))
+                        WHEN 1 THEN "Pazar"
+                        WHEN 2 THEN "Pazartesi"
+                        WHEN 3 THEN "Salı"
+                        WHEN 4 THEN "Çarşamba"
+                        WHEN 5 THEN "Perşembe"
+                        WHEN 6 THEN "Cuma"
+                        WHEN 7 THEN "Cumartesi"
+                    END, ", ",
+                    DAY(FROM_UNIXTIME(ue.timeend)), " ",
+                    CASE MONTH(FROM_UNIXTIME(ue.timeend))
+                        WHEN 1 THEN "Ocak"
+                        WHEN 2 THEN "Şubat"
+                        WHEN 3 THEN "Mart"
+                        WHEN 4 THEN "Nisan"
+                        WHEN 5 THEN "Mayıs"
+                        WHEN 6 THEN "Haziran"
+                        WHEN 7 THEN "Temmuz"
+                        WHEN 8 THEN "Ağustos"
+                        WHEN 9 THEN "Eylül"
+                        WHEN 10 THEN "Ekim"
+                        WHEN 11 THEN "Kasım"
+                        WHEN 12 THEN "Aralık"
+                    END, " ",
+                    YEAR(FROM_UNIXTIME(ue.timeend)), ", ",
+                    LPAD(HOUR(FROM_UNIXTIME(ue.timeend)), 2, "0"), ":",
+                    LPAD(MINUTE(FROM_UNIXTIME(ue.timeend)), 2, "0")
+                )
+            END AS enrollmentenddate',
             'progress' => 'COALESCE(ROUND(
                 100 * 
                 COALESCE(comp.completed_activities, 0) 
