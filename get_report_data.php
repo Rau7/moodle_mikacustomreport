@@ -277,8 +277,12 @@ try {
             'totalactivities' => 'COALESCE(tot.total_activities, 0) AS totalactivities',
             'completiontime' => 'CASE 
                 WHEN ccmp.timecompleted IS NULL OR ccmp.timecompleted = 0 THEN "Tamamlanmadı"
-                WHEN ccmp.timecompleted <= ue.timecreated THEN "00:00:00"
-                ELSE SEC_TO_TIME(ccmp.timecompleted - ue.timecreated)
+                WHEN ccmp.timecompleted <= ue.timecreated THEN "0 gün 0 saat 0 dakika"
+                ELSE CONCAT(
+                    FLOOR((ccmp.timecompleted - ue.timecreated) / 86400), " gün ",
+                    FLOOR(((ccmp.timecompleted - ue.timecreated) % 86400) / 3600), " saat ",
+                    FLOOR(((ccmp.timecompleted - ue.timecreated) % 3600) / 60), " dakika"
+                )
             END AS completiontime',
             'completiondate' => 'CASE 
                 WHEN ccmp.timecompleted IS NULL OR ccmp.timecompleted = 0 THEN "Tamamlanmadı"
