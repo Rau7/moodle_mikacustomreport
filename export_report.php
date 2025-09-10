@@ -204,6 +204,38 @@ try {
             'activitiescompleted' => 'COALESCE(comp.completed_activities, 0) AS activitiescompleted',
             'totalactivities' => 'COALESCE(tot.total_activities, 0) AS totalactivities',
             'completiontime' => 'SEC_TO_TIME(ccmp.timecompleted - ue.timecreated) AS completiontime',
+            'completiondate' => 'CASE 
+                WHEN ccmp.timecompleted IS NULL OR ccmp.timecompleted = 0 THEN "Tamamlanmadı"
+                ELSE CONCAT(
+                    CASE DAYOFWEEK(FROM_UNIXTIME(ccmp.timecompleted))
+                        WHEN 1 THEN "Pazar"
+                        WHEN 2 THEN "Pazartesi"
+                        WHEN 3 THEN "Salı"
+                        WHEN 4 THEN "Çarşamba"
+                        WHEN 5 THEN "Perşembe"
+                        WHEN 6 THEN "Cuma"
+                        WHEN 7 THEN "Cumartesi"
+                    END, ", ",
+                    DAY(FROM_UNIXTIME(ccmp.timecompleted)), " ",
+                    CASE MONTH(FROM_UNIXTIME(ccmp.timecompleted))
+                        WHEN 1 THEN "Ocak"
+                        WHEN 2 THEN "Şubat"
+                        WHEN 3 THEN "Mart"
+                        WHEN 4 THEN "Nisan"
+                        WHEN 5 THEN "Mayıs"
+                        WHEN 6 THEN "Haziran"
+                        WHEN 7 THEN "Temmuz"
+                        WHEN 8 THEN "Ağustos"
+                        WHEN 9 THEN "Eylül"
+                        WHEN 10 THEN "Ekim"
+                        WHEN 11 THEN "Kasım"
+                        WHEN 12 THEN "Aralık"
+                    END, " ",
+                    YEAR(FROM_UNIXTIME(ccmp.timecompleted)), ", ",
+                    LPAD(HOUR(FROM_UNIXTIME(ccmp.timecompleted)), 2, "0"), ":",
+                    LPAD(MINUTE(FROM_UNIXTIME(ccmp.timecompleted)), 2, "0")
+                )
+            END AS completiondate',
             'activitytimespent' => 'u.id AS userid, c.id AS courseid, "0:00:00" AS activitytimespent',  // Will be calculated using block_dedication
             'dedicationtime' => '"0:00:00" AS dedicationtime',  // Will be calculated in PHP
             'startdate' => 'c.startdate',
@@ -320,6 +352,7 @@ try {
         'activitiescompleted' => 'Tamamlanan Aktiviteler',
         'totalactivities' => 'Toplam Aktiviteler',
         'completiontime' => 'Tamamlanma Süresi',
+        'completiondate' => 'Tamamlanma Tarihi',
         'activitytimespent' => 'Eğitimde Geçirilen Süre',
         'dedicationtime' => 'Dedication Süresi',
         'startdate' => 'Başlangıç Tarihi',
