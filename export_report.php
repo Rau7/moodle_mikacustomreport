@@ -548,6 +548,41 @@ function exportCSV($sql, $params, $headers, $filename, $hasDateRange = false, $d
             $record->activitytimespent = $formattedTime;
         }
         
+        // Calculate completion status if needed (same logic as get_report_data.php)
+        $hasCompletionStatusField = isset($record->completionstatus);
+        if ($hasCompletionStatusField && isset($record->userid) && isset($record->courseid)) {
+            // Get values from existing fields
+            $timecompleted = null;
+            $progressPercentage = 0;
+            
+            // Check if completiontime field exists and has value (means completed)
+            if (isset($record->completiontime) && $record->completiontime !== null && $record->completiontime !== '00:00:00') {
+                $timecompleted = 1; // Mark as completed
+            }
+            
+            // Get progress percentage if available
+            if (isset($record->progress)) {
+                $progressPercentage = floatval($record->progress);
+            }
+            
+            // Get date range for calculation
+            $timestart = $hasDateRange ? strtotime($dateRange['startDate']) : null;
+            $timeend = $hasDateRange ? strtotime($dateRange['endDate']) : null;
+            
+            // Calculate completion status using helper
+            $completionStatus = dedication_helper::calculate_completion_status(
+                $record->userid,
+                $record->courseid,
+                $progressPercentage,
+                $timecompleted,
+                $timestart,
+                $timeend
+            );
+            
+            // Replace the default value with calculated value
+            $record->completionstatus = $completionStatus;
+        }
+        
         foreach ($record as $key => $value) {
             if ($key == 'userid' || $key == 'courseid') {
                 continue;
