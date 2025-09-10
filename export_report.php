@@ -481,17 +481,14 @@ try {
 
     // Format'a göre export et
     switch ($format) {
-        case 'csv':
-            exportCSV($sql, $searchParams, $headers, $filename);
-            break;
         case 'excel':
-            exportExcel($sql, $searchParams, $headers, $filename);
+            exportExcel($sql, $searchParams, $headers, $filename, $hasDateRange, $dateRange);
             break;
         case 'pdf':
-            exportPDF($sql, $searchParams, $headers, $filename);
+            exportPDF($sql, $searchParams, $headers, $filename, $hasDateRange, $dateRange);
             break;
         default:
-            exportCSV($sql, $searchParams, $headers, $filename);
+            exportCSV($sql, $searchParams, $headers, $filename, $hasDateRange, $dateRange);
     }
 
 } catch (Exception $e) {
@@ -500,7 +497,7 @@ try {
     echo json_encode(['error' => $e->getMessage()]);
 }
 
-function exportCSV($sql, $params, $headers, $filename) {
+function exportCSV($sql, $params, $headers, $filename, $hasDateRange = false, $dateRange = null) {
     global $DB;
     
     // CSV headers ayarla
@@ -525,6 +522,32 @@ function exportCSV($sql, $params, $headers, $filename) {
     
     foreach ($recordset as $record) {
         $row = [];
+        
+        // Calculate activitytimespent if needed (same logic as get_report_data.php)
+        $hasActivityTimeField = isset($record->activitytimespent);
+        if ($hasActivityTimeField && isset($record->userid) && isset($record->courseid)) {
+            $timestart = $hasDateRange ? strtotime($dateRange['startDate']) : null;
+            $timeend = $hasDateRange ? strtotime($dateRange['endDate']) : null;
+            
+            // Calculate dedication time using block_dedication manager
+            $dedicationResult = dedication_helper::calculate_dedication_time(
+                $record->userid,
+                $record->courseid,
+                $timestart,
+                $timeend,
+                false  // No debug info for export
+            );
+            
+            // Get actual seconds for formatting
+            $dedicationSeconds = is_array($dedicationResult) ? $dedicationResult['finalResult'] : $dedicationResult;
+            
+            // Format the time
+            $formattedTime = dedication_helper::format_dedication_time($dedicationSeconds);
+            
+            // Replace the default value with calculated value
+            $record->activitytimespent = $formattedTime;
+        }
+        
         foreach ($record as $key => $value) {
             if ($key == 'userid' || $key == 'courseid') {
                 continue;
@@ -545,13 +568,13 @@ function exportCSV($sql, $params, $headers, $filename) {
     exit;
 }
 
-function exportExcel($sql, $params, $headers, $filename) {
+function exportExcel($sql, $params, $headers, $filename, $hasDateRange = false, $dateRange = null) {
     // Excel export placeholder - use CSV for now
-    exportCSV($sql, $params, $headers, $filename);
+    exportCSV($sql, $params, $headers, $filename, $hasDateRange, $dateRange);
 }
 
-function exportPDF($sql, $params, $headers, $filename) {
+function exportPDF($sql, $params, $headers, $filename, $hasDateRange = false, $dateRange = null) {
     // PDF export placeholder - use CSV for now
-    exportCSV($sql, $params, $headers, $filename);
+    exportCSV($sql, $params, $headers, $filename, $hasDateRange, $dateRange);
 }
 ?>
