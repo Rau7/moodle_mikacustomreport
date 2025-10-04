@@ -126,88 +126,50 @@ class dedication_helper {
     private static function calculate_session_based_time($userid, $courseid, $starttime, $endtime, &$debugInfo) {
         global $DB;
         
-        // Session configuration (matching block_dedication defaults)
-        $sessionLimit = 3600; // 1 hour gap between sessions
-        $minSessionTime = 60;  // Minimum session duration
+        // Window function configuration (more accurate approach)
+        $maxSessionGap = 1800; // 30 dakika maksimum session süresi
         
         $debugInfo['sessionConfig'] = [
-            'sessionLimit' => $sessionLimit,
-            'minSessionTime' => $minSessionTime
+            'maxSessionGap' => $maxSessionGap,
+            'calculationMethod' => 'window-function'
         ];
         
         try {
-            // Get log entries for user and course within time range
-            $sql = "SELECT timecreated
-                    FROM {logstore_standard_log}
-                    WHERE userid = :userid
-                      AND courseid = :courseid
-                      AND timecreated >= :starttime
-                      AND timecreated <= :endtime
-                      AND origin != 'cli'
-                    ORDER BY timecreated ASC";
+            // Use window function approach for more accurate calculation
+            $sql = "SELECT 
+                        SUM(session_time) as total_seconds
+                    FROM (
+                        SELECT 
+                            LEAST(
+                                :maxgap,
+                                GREATEST(
+                                    0,
+                                    LEAD(timecreated) OVER (PARTITION BY userid, courseid ORDER BY timecreated) - timecreated
+                                )
+                            ) AS session_time
+                        FROM {logstore_standard_log}
+                        WHERE userid = :userid
+                          AND courseid = :courseid
+                          AND timecreated >= :starttime
+                          AND timecreated <= :endtime
+                          AND origin != 'cli'
+                        ORDER BY timecreated ASC
+                    ) AS sub
+                    WHERE session_time > 0";
             
             $params = [
                 'userid' => $userid,
                 'courseid' => $courseid,
                 'starttime' => $starttime,
-                'endtime' => $endtime
+                'endtime' => $endtime,
+                'maxgap' => $maxSessionGap
             ];
             
-            $logs = $DB->get_records_sql($sql, $params);
-            $debugInfo['logCount'] = count($logs);
+            $result = $DB->get_record_sql($sql, $params);
+            $totalTime = $result ? intval($result->total_seconds) : 0;
             
-            if (empty($logs)) {
-                $debugInfo['noLogs'] = true;
-                return 0;
-            }
-            
-            // Convert to simple array of timestamps
-            $timestamps = array_map(function($log) {
-                return $log->timecreated;
-            }, $logs);
-            
-            // Group into sessions and calculate total time
-            $totalTime = 0;
-            $sessionCount = 0;
-            $currentSessionStart = null;
-            $previousTime = null;
-            
-            foreach ($timestamps as $currentTime) {
-                if ($previousTime === null) {
-                    // First log entry - start new session
-                    $currentSessionStart = $currentTime;
-                    $previousTime = $currentTime;
-                    continue;
-                }
-                
-                $timeDiff = $currentTime - $previousTime;
-                
-                if ($timeDiff > $sessionLimit) {
-                    // Gap too large - end current session and start new one
-                    $sessionDuration = $previousTime - $currentSessionStart;
-                    if ($sessionDuration >= $minSessionTime) {
-                        $totalTime += $sessionDuration;
-                        $sessionCount++;
-                    }
-                    
-                    // Start new session
-                    $currentSessionStart = $currentTime;
-                }
-                
-                $previousTime = $currentTime;
-            }
-            
-            // Handle the last session
-            if ($currentSessionStart !== null && $previousTime !== null) {
-                $sessionDuration = $previousTime - $currentSessionStart;
-                if ($sessionDuration >= $minSessionTime) {
-                    $totalTime += $sessionDuration;
-                    $sessionCount++;
-                }
-            }
-            
-            $debugInfo['sessionCount'] = $sessionCount;
-            $debugInfo['calculationMethod'] = 'session-based';
+            $debugInfo['logCount'] = 'calculated-via-window-function';
+            $debugInfo['calculationMethod'] = 'window-function';
             
             return $totalTime;
             
